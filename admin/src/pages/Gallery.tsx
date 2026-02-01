@@ -66,8 +66,8 @@ export default function Gallery() {
 
   return (
     <div>
-      <h1 className="mb-4 text-2xl font-semibold text-slate-800">Галерея работ</h1>
-      <div className="mb-4 flex items-center gap-2">
+      <h1 className="mb-4 text-xl font-semibold text-slate-800 sm:text-2xl">Галерея работ</h1>
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center">
         <input
           ref={fileInputRef}
           type="file"
@@ -80,7 +80,7 @@ export default function Gallery() {
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading}
-          className="rounded-lg bg-amber-600 px-4 py-2 text-sm text-white hover:bg-amber-700 disabled:opacity-50"
+          className="w-full rounded-lg bg-amber-600 px-4 py-2 text-sm text-white hover:bg-amber-700 disabled:opacity-50 sm:w-auto"
         >
           {uploading ? 'Загрузка...' : '➕ Добавить изображение'}
         </button>
@@ -93,7 +93,7 @@ export default function Gallery() {
           Нет изображений. Добавьте первое.
         </p>
       ) : (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5">
           {list.map((img) => (
             <div
               key={img.id}

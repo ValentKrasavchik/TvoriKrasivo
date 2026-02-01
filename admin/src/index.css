@@ -6,6 +6,38 @@ body {
   @apply bg-slate-50 text-slate-900 antialiased;
 }
 
+/* FullCalendar: адаптивность на мобильных и планшетах */
+@media (max-width: 768px) {
+  .fc .fc-toolbar {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .fc .fc-toolbar-title {
+    font-size: 1rem;
+  }
+  .fc .fc-button {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+  }
+  .fc .fc-scrollgrid {
+    font-size: 0.75rem;
+  }
+  .fc-timegrid-slot-label {
+    font-size: 0.65rem;
+  }
+}
+@media (max-width: 480px) {
+  .fc .fc-header-toolbar {
+    flex-wrap: wrap;
+  }
+  .fc .fc-toolbar-chunk {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.25rem;
+  }
+}
+
 /* Равная высота слотов времени в календаре — последний слот не растягивается */
 .fc .fc-timegrid-slot {
   height: 2.5em !important;

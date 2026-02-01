@@ -124,11 +124,11 @@ export default function Workshops() {
 
   return (
     <div>
-      <h1 className="mb-4 text-2xl font-semibold text-slate-800">Мастер-классы</h1>
+      <h1 className="mb-4 text-xl font-semibold text-slate-800 sm:text-2xl">Мастер-классы</h1>
       <button
         type="button"
         onClick={openCreate}
-        className="mb-4 rounded-lg bg-amber-600 px-4 py-2 text-sm text-white hover:bg-amber-700"
+        className="mb-4 w-full rounded-lg bg-amber-600 px-4 py-2 text-sm text-white hover:bg-amber-700 sm:w-auto"
       >
         Добавить мастер-класс
       </button>
@@ -137,7 +137,56 @@ export default function Workshops() {
         {loading ? (
           <p className="p-4">Загрузка...</p>
         ) : (
-          <table className="w-full text-sm">
+          <>
+          {/* Карточки для мобильных и планшетов */}
+          <div className="space-y-3 p-4 md:hidden">
+            {list.length === 0 ? (
+              <p className="text-slate-500">Нет мастер-классов. Добавьте первый.</p>
+            ) : (
+              list.map((w) => (
+                <div key={w.id} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                  <div className="mb-2 flex items-start gap-3">
+                    {w.imageUrl ? (
+                      <img
+                        src={fullImageUrl(w.imageUrl as string)}
+                        alt=""
+                        className="h-14 w-14 shrink-0 rounded object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded bg-slate-200 text-slate-400">—</div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium text-slate-800">{w.title}</div>
+                      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-600">
+                        <span>{w.durationMinutes} мин</span>
+                        <span>Вместимость: {w.capacityPerSlot}</span>
+                        <span>{w.price} ₽</span>
+                        <span>{w.isActive ? 'Активен' : 'Неактивен'}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => openEdit(w)}
+                      className="text-sm text-amber-700 hover:underline"
+                    >
+                      Изменить
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(w.id)}
+                      className="text-sm text-red-600 hover:underline"
+                    >
+                      Удалить
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          <table className="hidden w-full text-sm md:table">
             <thead className="bg-slate-50">
               <tr>
                 <th className="border-b border-slate-200 px-4 py-3 text-left font-medium">Фото</th>
@@ -188,6 +237,7 @@ export default function Workshops() {
               ))}
             </tbody>
           </table>
+          </>
         )}
         {!loading && list.length === 0 && (
           <p className="p-4 text-slate-500">Нет мастер-классов. Добавьте первый.</p>
@@ -196,11 +246,11 @@ export default function Workshops() {
 
       {modal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
           onClick={() => setModal(null)}
         >
           <div
-            className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-xl bg-white p-6 shadow-xl"
+            className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-xl bg-white p-4 shadow-xl sm:p-6"
             onClick={(e) => e.stopPropagation()}
           >
             <h2 className="mb-4 font-semibold">
@@ -264,7 +314,7 @@ export default function Workshops() {
                   rows={2}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label className="block text-sm text-slate-600">Длительность (мин)</label>
                   <input

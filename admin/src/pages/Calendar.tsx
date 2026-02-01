@@ -175,15 +175,15 @@ export default function Calendar() {
 
   return (
     <div>
-      <h1 className="mb-4 text-2xl font-semibold text-slate-800">Календарь слотов</h1>
-      <div className="mb-4 flex flex-wrap items-center gap-4">
+      <h1 className="mb-4 text-xl font-semibold text-slate-800 sm:text-2xl">Календарь слотов</h1>
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
         <select
           value={workshopId}
           onChange={(e) => {
             setWorkshopId(e.target.value);
             setTimeout(refetchEvents, 0);
           }}
-          className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm sm:w-auto"
         >
           <option value="">{workshops.length ? 'Мастер-класс' : 'Загрузка...'}</option>
           {workshops.map((w) => (
@@ -192,17 +192,18 @@ export default function Calendar() {
             </option>
           ))}
         </select>
-        <span className="text-sm text-slate-500">
+        <span className="text-xs text-slate-500 sm:text-sm">
           Период: {dateFrom} … {dateTo} (неделя/месяц — переключайте в календаре)
         </span>
       </div>
       {error && <p className="mb-2 text-sm text-red-600">{error}</p>}
-      <div className="rounded-xl border border-slate-200 bg-white p-4">
+      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white p-2 sm:p-4 [&_.fc]:min-w-[320px]">
         <FullCalendar
           ref={calendarRef}
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
           initialView="timeGridWeek"
           locale={ruLocale}
+          height={650}
           events={async (fetchInfo, successCallback) => {
             const wid = workshopIdRef.current;
             if (!wid) {
@@ -229,7 +230,7 @@ export default function Calendar() {
             const slot = event.extendedProps?.slot as Slot;
             if (slot) openEdit(slot);
           }}
-          headerToolbar={{ left: 'today prev,next', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay' }}
+          headerToolbar={{ left: 'prev,next', center: 'title', right: 'today dayGridMonth,timeGridWeek,timeGridDay' }}
           buttonText={{ month: 'Месяц', week: 'Неделя', day: 'День' }}
           slotMinTime="09:00:00"
           slotMaxTime="23:00:00"
@@ -243,8 +244,8 @@ export default function Calendar() {
       </div>
 
       {modal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setModal(null)}>
-          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 sm:p-6" onClick={() => setModal(null)}>
+          <div className="w-full max-w-sm max-h-[90vh] overflow-y-auto rounded-xl bg-white p-4 shadow-xl sm:p-6" onClick={(e) => e.stopPropagation()}>
             <h2 className="mb-4 font-semibold">{modal.type === 'create' ? 'Новый слот' : 'Редактировать слот'}</h2>
             <div className="space-y-3">
               <div>

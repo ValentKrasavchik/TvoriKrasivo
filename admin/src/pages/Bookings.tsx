@@ -127,24 +127,24 @@ export default function Bookings() {
 
   return (
     <div>
-      <h1 className="mb-4 text-2xl font-semibold text-slate-800">Записи</h1>
-      <div className="mb-4 flex flex-wrap items-center gap-3">
+      <h1 className="mb-4 text-xl font-semibold text-slate-800 sm:text-2xl">Записи</h1>
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
         <input
           type="date"
           value={dateFrom}
           onChange={(e) => setDateFrom(e.target.value)}
-          className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm sm:w-auto"
         />
         <input
           type="date"
           value={dateTo}
           onChange={(e) => setDateTo(e.target.value)}
-          className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm sm:w-auto"
         />
         <select
           value={workshopId}
           onChange={(e) => setWorkshopId(e.target.value)}
-          className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm sm:w-auto"
         >
           <option value="">Все мастер-классы</option>
           {workshopsList.map(({ id, title }) => (
@@ -156,7 +156,7 @@ export default function Bookings() {
         <select
           value={status}
           onChange={(e) => setStatus(e.target.value)}
-          className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm sm:w-auto"
         >
           <option value="">Все статусы</option>
           {Object.entries(STATUS_LABEL).map(([id, label]) => (
@@ -171,7 +171,58 @@ export default function Bookings() {
         {loading ? (
           <p className="p-4">Загрузка...</p>
         ) : (
-          <table className="w-full text-sm">
+          <>
+          {/* Карточки для мобильных и планшетов */}
+          <div className="space-y-3 p-4 md:hidden">
+            {bookings.length === 0 ? (
+              <p className="text-slate-500">Нет записей по выбранным фильтрам.</p>
+            ) : (
+              bookings.map((b) => (
+              <div
+                key={b.id}
+                className="rounded-lg border border-slate-200 bg-slate-50 p-4"
+              >
+                <div className="mb-2 flex items-start justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDetail(b)}
+                    className="font-medium text-amber-700 hover:underline"
+                  >
+                    {b.name}
+                  </button>
+                  <span className="shrink-0 rounded bg-slate-200 px-2 py-0.5 text-xs text-slate-700">
+                    {STATUS_LABEL[b.status] || b.status}
+                  </span>
+                </div>
+                <p className="text-sm text-slate-600">
+                  {b.slot.date} {b.slot.time} — {WORKSHOPS[b.slot.workshopId] || b.slot.workshopId}
+                </p>
+                <p className="text-sm text-slate-500">{b.phone}</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {b.status === 'PENDING_ADMIN' && (
+                    <>
+                      <button type="button" onClick={() => handleApprove(b.id)} className="text-sm text-green-700 hover:underline">Принять</button>
+                      <button type="button" onClick={() => handleReject(b.id)} className="text-sm text-orange-600 hover:underline">Отклонить</button>
+                    </>
+                  )}
+                  {b.status === 'PENDING' && (
+                    <>
+                      <button type="button" onClick={() => handleConfirm(b.id)} className="text-sm text-green-700 hover:underline">Подтвердить</button>
+                      <button type="button" onClick={() => handleCancel(b.id)} className="text-sm text-red-600 hover:underline">Отменить</button>
+                    </>
+                  )}
+                  {b.status === 'CONFIRMED' && (
+                    <button type="button" onClick={() => handleCancel(b.id)} className="text-sm text-red-600 hover:underline">Отменить</button>
+                  )}
+                  <button type="button" onClick={() => handleDelete(b.id)} className="text-sm text-slate-500 hover:text-red-700 hover:underline">Удалить</button>
+                </div>
+              </div>
+            ))
+            )}
+          </div>
+
+          {/* Таблица для десктопа */}
+          <table className="hidden w-full text-sm md:table">
             <thead className="bg-slate-50">
               <tr>
                 <th className="border-b border-slate-200 px-4 py-3 text-left font-medium">Дата / время</th>
@@ -259,19 +310,20 @@ export default function Bookings() {
               ))}
             </tbody>
           </table>
+          </>
         )}
         {!loading && bookings.length === 0 && (
-          <p className="p-4 text-slate-500">Нет записей по выбранным фильтрам.</p>
+          <p className="hidden p-4 text-slate-500 md:block">Нет записей по выбранным фильтрам.</p>
         )}
       </div>
 
       {detail && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
           onClick={() => setDetail(null)}
         >
           <div
-            className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl"
+            className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-xl bg-white p-4 shadow-xl sm:p-6"
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="mb-3 font-semibold">Детали записи</h3>
