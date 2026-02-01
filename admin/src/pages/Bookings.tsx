@@ -194,8 +194,20 @@ export default function Bookings() {
                     {STATUS_LABEL[b.status] || b.status}
                   </span>
                 </div>
-                <p className="text-sm text-slate-600">
-                  {b.slot.date} {b.slot.time} — {WORKSHOPS[b.slot.workshopId] || b.slot.workshopId}
+                <p className="flex items-center gap-2 text-sm text-slate-600">
+                  <button
+                    type="button"
+                    onClick={() => setDetail(b)}
+                    className="shrink-0 rounded p-1 text-slate-500 hover:bg-slate-200 hover:text-slate-700"
+                    title="Открыть детали записи"
+                    aria-label="Открыть детали записи"
+                  >
+                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  </button>
+                  <span>{b.slot.date} {b.slot.time} — {WORKSHOPS[b.slot.workshopId] || b.slot.workshopId}</span>
                 </p>
                 <p className="text-sm text-slate-500">{b.phone}</p>
                 <div className="mt-3 flex flex-wrap gap-2">
@@ -225,6 +237,7 @@ export default function Bookings() {
           <table className="hidden w-full text-sm md:table">
             <thead className="bg-slate-50">
               <tr>
+                <th className="w-10 border-b border-slate-200 px-2 py-3 text-left font-medium" aria-label="Просмотр" />
                 <th className="border-b border-slate-200 px-4 py-3 text-left font-medium">Дата / время</th>
                 <th className="border-b border-slate-200 px-4 py-3 text-left font-medium">Мастер-класс</th>
                 <th className="border-b border-slate-200 px-4 py-3 text-left font-medium">Имя</th>
@@ -236,6 +249,20 @@ export default function Bookings() {
             <tbody>
               {bookings.map((b) => (
                 <tr key={b.id} className="border-b border-slate-100 hover:bg-slate-50">
+                  <td className="w-10 px-2 py-3">
+                    <button
+                      type="button"
+                      onClick={() => setDetail(b)}
+                      className="rounded p-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-700"
+                      title="Открыть детали записи"
+                      aria-label="Открыть детали записи"
+                    >
+                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                    </button>
+                  </td>
                   <td className="px-4 py-3">
                     {b.slot.date} {b.slot.time}
                   </td>
@@ -344,12 +371,10 @@ export default function Bookings() {
                 <dt className="text-slate-500">Участников</dt>
                 <dd>{detail.participants}</dd>
               </div>
-              {detail.comment && (
-                <div>
-                  <dt className="text-slate-500">Комментарий</dt>
-                  <dd>{detail.comment}</dd>
-                </div>
-              )}
+              <div>
+                <dt className="text-slate-500">Комментарий</dt>
+                <dd>{detail.comment?.trim() ? detail.comment : '—'}</dd>
+              </div>
               <div>
                 <dt className="text-slate-500">Слот</dt>
                 <dd>
