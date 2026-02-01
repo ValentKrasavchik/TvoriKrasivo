@@ -21,6 +21,8 @@
   
   <!-- Styles -->
   <link rel="stylesheet" href="css/style.css">
+  <!-- Yandex Maps API 2.1 (менее строгие требования по Referer, чем у v3) -->
+  <script src="https://api-maps.yandex.ru/2.1/?apikey=85a20b71-ac80-4e19-b8b7-dcb28ae6b79a&lang=ru_RU" type="text/javascript"></script>
   <!-- FullCalendar -->
   <link href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.5/main.min.css" rel="stylesheet">
   
@@ -283,17 +285,7 @@
           </div>
           
           <div class="contacts-map">
-            <div style="text-align: center; padding: 2rem;">
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin-bottom: 1rem; opacity: 0.5;">
-                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
-                <circle cx="12" cy="10" r="3"/>
-              </svg>
-              <p style="margin-bottom: 0.5rem; font-weight: 500;">Мы на карте</p>
-              <p style="font-size: 0.875rem; color: var(--color-text-muted);">
-                Донецк, ул. Розы Люксембург 75А<br>
-                5 этаж, каб. 507
-              </p>
-            </div>
+            <div id="yandexMap" class="contacts-map-inner" aria-label="Карта: Донецк, ул. Розы Люксембург 75А, 5 этаж, каб. 507"></div>
           </div>
         </div>
       </div>

@@ -902,6 +902,48 @@ function renderFAQ(faqItems) {
 // 9. КОНТАКТЫ
 // ==========================================================================
 
+/** Инициализация карты Яндекса в блоке контактов (API 2.1 — менее строгий Referer) */
+function initYandexMap() {
+  const container = document.getElementById('yandexMap');
+  if (!container) return;
+
+  function showFallback() {
+    container.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--color-text-muted);">' +
+      '<p style="margin-bottom: 0.5rem; font-weight: 500;">Мы на карте</p>' +
+      '<p style="font-size: 0.875rem;">Донецк, ул. Розы Люксембург 75А<br>5 этаж, каб. 507</p>' +
+      '<a href="https://yandex.ru/maps/?text=%D0%94%D0%BE%D0%BD%D0%B5%D1%86%D0%BA+%D1%83%D0%BB.+%D0%A0%D0%BE%D0%B7%D1%8B+%D0%9B%D1%8E%D0%BA%D1%81%D0%B5%D0%BC%D0%B1%D1%83%D1%80%D0%B3+75%D0%90" target="_blank" rel="noopener" class="btn btn-secondary" style="margin-top: 1rem;">Открыть в Яндекс.Картах</a>' +
+      '</div>';
+  }
+
+  if (typeof ymaps === 'undefined') {
+    showFallback();
+    return;
+  }
+
+  ymaps.ready(function () {
+    try {
+      // API 2.1: center [широта, долгота]
+      const center = [48.009, 37.803]; // Донецк, ул. Розы Люксембург 75А
+
+      const map = new ymaps.Map('yandexMap', {
+        center: center,
+        zoom: 17,
+        controls: ['zoomControl', 'typeSelector', 'fullscreenControl'],
+      });
+
+      const placemark = new ymaps.Placemark(center, {
+        balloonContentHeader: 'Твори Красиво',
+        balloonContentBody: 'Донецк, ул. Розы Люксембург 75А<br>5 этаж, каб. 507',
+        hintContent: 'Твори Красиво',
+      });
+      map.geoObjects.add(placemark);
+    } catch (err) {
+      console.warn('Yandex Maps не загрузилась:', err);
+      showFallback();
+    }
+  });
+}
+
 function renderContacts(contacts) {
   const container = document.getElementById('contactsInfo');
   if (!container) return;
@@ -1111,6 +1153,7 @@ async function init() {
   if (data.faq) renderFAQ(data.faq);
   if (data.contacts) renderContacts(data.contacts);
   initGallery();
+  initYandexMap();
 }
 
 // Запускаем при загрузке DOM
