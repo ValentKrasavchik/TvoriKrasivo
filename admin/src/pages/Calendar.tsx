@@ -193,7 +193,7 @@ export default function Calendar() {
           ))}
         </select>
         <span className="text-sm text-slate-500">
-          Неделя: {dateFrom} … {dateTo} (перелистывайте календарь для загрузки слотов)
+          Период: {dateFrom} … {dateTo} (неделя/месяц — переключайте в календаре)
         </span>
       </div>
       {error && <p className="mb-2 text-sm text-red-600">{error}</p>}
@@ -229,11 +229,13 @@ export default function Calendar() {
             const slot = event.extendedProps?.slot as Slot;
             if (slot) openEdit(slot);
           }}
-          headerToolbar={{ left: 'today prev,next', center: 'title', right: 'timeGridWeek,timeGridDay' }}
+          headerToolbar={{ left: 'today prev,next', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay' }}
+          buttonText={{ month: 'Месяц', week: 'Неделя', day: 'День' }}
           slotMinTime="09:00:00"
           slotMaxTime="23:00:00"
           slotDuration="00:30:00"
           views={{
+            dayGridMonth: { titleFormat: { month: 'long', year: 'numeric' } },
             timeGridWeek: { slotMinTime: '09:00:00', slotMaxTime: '23:00:00' },
             timeGridDay: { slotMinTime: '09:00:00', slotMaxTime: '23:00:00' },
           }}

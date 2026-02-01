@@ -1,0 +1,19 @@
+[Unit]
+Description=Твори Красиво Backend API
+After=network.target
+
+[Service]
+Type=simple
+User=vps
+WorkingDirectory=/var/www/gonchar/1/backend
+ExecStart=/var/www/gonchar/1/backend/start.sh
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+Environment=NODE_ENV=production
+# Если node установлен через nvm, раскомментируйте и укажите путь:
+# Environment=PATH=/home/vps/.nvm/versions/node/v20.x.x/bin:/usr/bin:/bin
+
+[Install]
+WantedBy=multi-user.target

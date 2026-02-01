@@ -13,9 +13,19 @@ npx prisma generate
 npx prisma migrate dev --name init
 npx prisma db seed
 
-# Запуск API на http://localhost:3001
+# Запуск API на http://localhost:3001 (разработка)
 npm run dev
 ```
+
+### Постоянный запуск (systemd)
+
+Бэкенд настроен как systemd-сервис: он стартует при загрузке сервера и автоматически перезапускается при падении.
+
+- **Статус:** `sudo systemctl status tvori-krasivo-backend`
+- **Перезапуск:** `sudo systemctl restart tvori-krasivo-backend`
+- **Логи:** `journalctl -u tvori-krasivo-backend -f`
+
+Сервис уже установлен и включён. Файл юнита в репозитории: `tvori-krasivo-backend.service`.
 
 ## Переменные (.env)
 
