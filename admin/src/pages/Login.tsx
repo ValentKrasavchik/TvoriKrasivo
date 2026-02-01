@@ -25,8 +25,8 @@ export default function Login() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-100">
-      <div className="w-full max-w-sm rounded-xl bg-white p-8 shadow-lg">
+    <div className="flex min-h-screen items-center justify-center bg-slate-100 px-4 py-6 sm:px-6">
+      <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-lg sm:p-8">
         <h1 className="mb-6 text-xl font-semibold text-slate-800">Вход в админку</h1>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>

@@ -76,11 +76,11 @@ export default function Reviews() {
 
   return (
     <div>
-      <h1 className="mb-4 text-2xl font-semibold text-slate-800">Отзывы гостей</h1>
+      <h1 className="mb-4 text-xl font-semibold text-slate-800 sm:text-2xl">Отзывы гостей</h1>
       <button
         type="button"
         onClick={openCreate}
-        className="mb-4 rounded-lg bg-amber-600 px-4 py-2 text-sm text-white hover:bg-amber-700"
+        className="mb-4 w-full rounded-lg bg-amber-600 px-4 py-2 text-sm text-white hover:bg-amber-700 sm:w-auto"
       >
         Добавить отзыв
       </button>
@@ -89,7 +89,34 @@ export default function Reviews() {
         {loading ? (
           <p className="p-4">Загрузка...</p>
         ) : (
-          <table className="w-full text-sm">
+          <>
+          {/* Карточки для мобильных и планшетов */}
+          <div className="space-y-3 p-4 md:hidden">
+            {list.length === 0 ? (
+              <p className="text-slate-500">Нет отзывов. Добавьте первый.</p>
+            ) : (
+              list.map((r) => (
+                <div key={r.id} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                  <div className="mb-2 flex items-start justify-between gap-2">
+                    <span className="font-medium text-slate-800">{r.name}</span>
+                    <span className="shrink-0 text-sm text-amber-600">{r.rating} ★</span>
+                  </div>
+                  <p className="line-clamp-3 text-sm text-slate-600">{r.text}</p>
+                  <p className="mt-2 text-xs text-slate-500">{r.date}</p>
+                  <div className="mt-3 flex gap-2">
+                    <button type="button" onClick={() => openEdit(r)} className="text-sm text-amber-700 hover:underline">
+                      Изменить
+                    </button>
+                    <button type="button" onClick={() => handleDelete(r.id)} className="text-sm text-red-600 hover:underline">
+                      Удалить
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          <table className="hidden w-full text-sm md:table">
             <thead className="bg-slate-50">
               <tr>
                 <th className="border-b border-slate-200 px-4 py-3 text-left font-medium">Имя</th>
@@ -118,6 +145,7 @@ export default function Reviews() {
               ))}
             </tbody>
           </table>
+          </>
         )}
         {!loading && list.length === 0 && (
           <p className="p-4 text-slate-500">Нет отзывов. Добавьте первый.</p>
@@ -125,9 +153,9 @@ export default function Reviews() {
       </div>
 
       {modal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setModal(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setModal(null)}>
           <div
-            className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-xl bg-white p-6 shadow-xl"
+            className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-xl bg-white p-4 shadow-xl sm:p-6"
             onClick={(e) => e.stopPropagation()}
           >
             <h2 className="mb-4 font-semibold">{modal.type === 'create' ? 'Новый отзыв' : 'Редактировать отзыв'}</h2>
