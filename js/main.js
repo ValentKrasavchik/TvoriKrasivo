@@ -380,6 +380,85 @@ function isSmallScreen() {
   return typeof window !== 'undefined' && window.innerWidth < 768;
 }
 
+function openSlotsOverviewModal() {
+  if (!bookingCalendar || !selectedWorkshop) return;
+  var d = bookingCalendar.getDate();
+  var year = d.getFullYear();
+  var month = d.getMonth();
+  var dateFrom = year + '-' + String(month + 1).padStart(2, '0') + '-01';
+  var lastDay = new Date(year, month + 1, 0).getDate();
+  var dateTo = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(lastDay).padStart(2, '0');
+  var byDay = {};
+  publicSlotsCache.forEach(function (s) {
+    var free = s.freeSeats != null ? s.freeSeats : 0;
+    var open = (s.status || '') === 'OPEN';
+    if (s.date && open && free > 0) {
+      byDay[s.date] = (byDay[s.date] || 0) + 1;
+    }
+  });
+  var monthNames = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+  var weekdayShort = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+  var first = new Date(year, month, 1);
+  var startDow = first.getDay() === 0 ? 6 : first.getDay() - 1;
+  var daysInMonth = new Date(year, month + 1, 0).getDate();
+  var grid = [];
+  var i;
+  for (i = 0; i < startDow; i++) grid.push(null);
+  for (i = 1; i <= daysInMonth; i++) grid.push(i);
+  while (grid.length % 7 !== 0) grid.push(null);
+  var html = '<h3 class="slots-overview-month">' + monthNames[month] + ' ' + year + '</h3>';
+  html += '<div class="slots-overview-weekdays">';
+  weekdayShort.forEach(function (w) { html += '<span class="slots-overview-wd">' + w + '</span>'; });
+  html += '</div><div class="slots-overview-grid">';
+  grid.forEach(function (day, idx) {
+    if (day === null) {
+      html += '<div class="slots-overview-cell slots-overview-cell--empty"></div>';
+      return;
+    }
+    var dateStr = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+    var count = byDay[dateStr] || 0;
+    html += '<div class="slots-overview-cell slots-overview-cell--clickable" role="button" tabindex="0" data-date="' + dateStr + '" title="Перейти к ' + dateStr + '">';
+    html += '<span class="slots-overview-day">' + day + '</span>';
+    if (count > 0) {
+      html += '<span class="slots-overview-badge">' + count + '</span>';
+    }
+    html += '</div>';
+  });
+  html += '</div>';
+  var content = document.getElementById('slotsOverviewContent');
+  if (content) {
+    content.innerHTML = html;
+    content.querySelectorAll('.slots-overview-cell--clickable').forEach(function (cell) {
+      var dateStr = cell.getAttribute('data-date');
+      function goToDate() {
+        if (!dateStr || !bookingCalendar) return;
+        closeSlotsOverviewModal();
+        bookingCalendar.gotoDate(dateStr);
+      }
+      cell.addEventListener('click', goToDate);
+      cell.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          goToDate();
+        }
+      });
+    });
+  }
+  var modal = document.getElementById('slotsOverviewModal');
+  if (modal) {
+    modal.style.display = 'flex';
+    modal.classList.add('active');
+  }
+}
+
+function closeSlotsOverviewModal() {
+  var modal = document.getElementById('slotsOverviewModal');
+  if (modal) {
+    modal.style.display = 'none';
+    modal.classList.remove('active');
+  }
+}
+
 async function openBookingModal(workshopId) {
   const modal = document.getElementById('bookingModal');
   const workshop = workshopsData.workshops.find(w => w.id === workshopId);
@@ -561,7 +640,14 @@ async function openBookingModal(workshopId) {
     stickyHeaderDates: true,
     handleWindowResize: true,
 
-    headerToolbar: { left: 'today prev,next', center: 'title', right: '' },
+    headerToolbar: { left: 'today prev,next', center: 'title', right: 'calendarOverview' },
+    customButtons: {
+      calendarOverview: {
+        text: '📅',
+        hint: 'Обзор слотов по дням месяца',
+        click: openSlotsOverviewModal,
+      },
+    },
     locale: 'ru',
     slotMinTime: '09:00:00',
     slotMaxTime: '21:00:00',
@@ -989,6 +1075,21 @@ function initPrivacyModal() {
   }
 }
 
+function initSlotsOverviewModal() {
+  var modal = document.getElementById('slotsOverviewModal');
+  var closeBtn = document.getElementById('closeSlotsOverviewBtn');
+  var closeIcon = document.getElementById('closeSlotsOverviewModal');
+  if (!modal) return;
+  function closeFn() {
+    closeSlotsOverviewModal();
+  }
+  if (closeBtn) closeBtn.addEventListener('click', closeFn);
+  if (closeIcon) closeIcon.addEventListener('click', closeFn);
+  modal.addEventListener('click', function (e) {
+    if (e.target === modal) closeFn();
+  });
+}
+
 // ==========================================================================
 // 12. ЗАПУСК ПРИЛОЖЕНИЯ
 // ==========================================================================
@@ -1001,6 +1102,7 @@ async function init() {
   initNavigation();
   initBookingModal();
   initPrivacyModal();
+  initSlotsOverviewModal();
 
   // Рендерим контент (галерея рендерится из API, затем вешаем lightbox)
   if (data.workshops) renderWorkshops(data.workshops);

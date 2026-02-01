@@ -1539,6 +1539,131 @@ p {
 }
 
 /* --------------------------------------------------------------------------
+   Обзор слотов по дням месяца (модалка по кнопке календаря в форме записи)
+   -------------------------------------------------------------------------- */
+.slots-overview-modal {
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  z-index: 10000;
+}
+.slots-overview-modal-inner {
+  width: 100%;
+  max-width: 420px;
+  background-color: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
+  overflow: hidden;
+}
+.slots-overview-modal .modal-header {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--color-border-light);
+}
+.slots-overview-modal .modal-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin: 0;
+}
+.slots-overview-modal .modal-body {
+  padding: 1.5rem;
+}
+#slotsOverviewContent {
+  margin-bottom: 0;
+}
+.slots-overview-month {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0 0 1rem 0;
+  text-align: center;
+  letter-spacing: -0.01em;
+}
+.slots-overview-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  text-align: center;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--color-text-muted);
+  margin-bottom: 6px;
+}
+.slots-overview-wd {
+  min-width: 0;
+}
+.slots-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+.slots-overview-cell {
+  aspect-ratio: 1;
+  min-height: 36px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-text);
+  background: var(--color-surface);
+  transition: border-color 0.15s, background-color 0.15s;
+}
+.slots-overview-cell:not(.slots-overview-cell--empty):hover {
+  border-color: var(--color-border);
+  background: rgba(0, 0, 0, 0.02);
+}
+.slots-overview-cell--clickable {
+  cursor: pointer;
+}
+.slots-overview-cell--clickable:hover {
+  border-color: var(--color-accent-light);
+  background: rgba(192, 138, 106, 0.08);
+}
+.slots-overview-cell--empty {
+  border-color: transparent;
+  background: transparent;
+  min-height: 0;
+}
+.slots-overview-day {
+  display: block;
+  line-height: 1.2;
+}
+.slots-overview-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  margin-top: 3px;
+  padding: 0 4px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--color-accent);
+  border-radius: 50%;
+  line-height: 1;
+}
+.slots-overview-legend {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  margin: 1.25rem 0 1rem 0;
+  line-height: 1.4;
+  text-align: center;
+}
+.slots-overview-modal .modal-body #closeSlotsOverviewBtn {
+  width: 100%;
+  margin-top: 0;
+  padding: 0.75rem 1.25rem;
+  font-weight: 500;
+  border-radius: var(--radius-md);
+}
+
+/* --------------------------------------------------------------------------
    Политика конфиденциальности (модалка)
    -------------------------------------------------------------------------- */
 .privacy-modal .modal {

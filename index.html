@@ -436,6 +436,26 @@
     </div>
   </div>
 
+  <!-- Модалка: обзор слотов по дням месяца (календарь-иконка в форме записи) -->
+  <div class="modal-overlay slots-overview-modal" id="slotsOverviewModal" role="dialog" aria-modal="true" aria-labelledby="slotsOverviewTitle" style="display: none;">
+    <div class="modal slots-overview-modal-inner">
+      <div class="modal-header">
+        <h3 class="modal-title" id="slotsOverviewTitle">Слоты по дням</h3>
+        <button class="modal-close" aria-label="Закрыть" id="closeSlotsOverviewModal">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div id="slotsOverviewContent"><!-- заполняется из JS --></div>
+        <p class="slots-overview-legend">Число в кружке — количество слотов с местами в этот день</p>
+        <button type="button" class="btn btn-secondary" id="closeSlotsOverviewBtn">Закрыть</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ========== МОДАЛЬНОЕ ОКНО ПОЛИТИКИ ========== -->
   <div class="modal-overlay privacy-modal" id="privacyModal" role="dialog" aria-modal="true" aria-labelledby="privacyModalTitle">
     <div class="modal">

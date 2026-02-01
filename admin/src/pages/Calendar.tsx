@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
@@ -63,6 +64,9 @@ export default function Calendar() {
   const [dateTo, setDateTo] = useState(initialWeek.dateTo);
   const [modal, setModal] = useState<{ type: 'create' | 'edit'; slot?: Slot; date?: string; time?: string } | null>(null);
   const [form, setForm] = useState({ workshopId: '', date: '', time: '12:00', capacity: 6, freeze: false, durationMinutes: 120 });
+  const [slotsOverviewOpen, setSlotsOverviewOpen] = useState(false);
+  const [overviewCountByDay, setOverviewCountByDay] = useState<Record<string, number>>({});
+  const [overviewMonthYear, setOverviewMonthYear] = useState<{ year: number; month: number } | null>(null);
   const calendarRef = useRef<FullCalendar>(null);
   const workshopIdRef = useRef(workshopId);
   workshopIdRef.current = workshopId;
@@ -173,6 +177,51 @@ export default function Calendar() {
     }
   }
 
+  async function openSlotsOverview() {
+    const api = calendarRef.current?.getApi();
+    const wid = workshopIdRef.current;
+    if (!api || !wid) return;
+    const d = api.getDate();
+    const year = d.getFullYear();
+    const month = d.getMonth();
+    const dateFrom = `${year}-${String(month + 1).padStart(2, '0')}-01`;
+    const lastDay = new Date(year, month + 1, 0).getDate();
+    const dateTo = `${year}-${String(month + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+    setOverviewMonthYear({ year, month });
+    try {
+      const slots = await fetchSlots({ workshopId: wid, dateFrom, dateTo });
+      const byDay: Record<string, number> = {};
+      for (const s of slots as Slot[]) {
+        const free = s.freeSeats ?? 0;
+        const open = (s.status || '') === 'OPEN';
+        if (s.date && open && free > 0) {
+          byDay[s.date] = (byDay[s.date] ?? 0) + 1;
+        }
+      }
+      setOverviewCountByDay(byDay);
+      setSlotsOverviewOpen(true);
+    } catch {
+      setOverviewCountByDay({});
+      setSlotsOverviewOpen(true);
+    }
+  }
+
+  function buildMonthGrid(year: number, month: number) {
+    const first = new Date(year, month, 1);
+    const last = new Date(year, month + 1, 0);
+    const startDow = first.getDay() === 0 ? 6 : first.getDay() - 1;
+    const daysInMonth = last.getDate();
+    const totalCells = Math.ceil((startDow + daysInMonth) / 7) * 7;
+    const grid: (number | null)[] = [];
+    for (let i = 0; i < startDow; i++) grid.push(null);
+    for (let d = 1; d <= daysInMonth; d++) grid.push(d);
+    while (grid.length < totalCells) grid.push(null);
+    return { grid, daysInMonth };
+  }
+
+  const monthNames = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+  const weekdayShort = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+
   return (
     <div>
       <h1 className="mb-4 text-xl font-semibold text-slate-800 sm:text-2xl">Календарь слотов</h1>
@@ -230,7 +279,14 @@ export default function Calendar() {
             const slot = event.extendedProps?.slot as Slot;
             if (slot) openEdit(slot);
           }}
-          headerToolbar={{ left: 'prev,next', center: 'title', right: 'today dayGridMonth,timeGridWeek,timeGridDay' }}
+          headerToolbar={{ left: 'prev,next', center: 'title', right: 'today dayGridMonth,timeGridWeek,timeGridDay calendarOverview' }}
+          customButtons={{
+            calendarOverview: {
+              text: '📅',
+              hint: 'Обзор слотов по дням месяца',
+              click: openSlotsOverview,
+            },
+          }}
           buttonText={{ month: 'Месяц', week: 'Неделя', day: 'День' }}
           slotMinTime="09:00:00"
           slotMaxTime="23:00:00"
@@ -340,6 +396,101 @@ export default function Calendar() {
           </div>
         </div>
       )}
+
+      {slotsOverviewOpen &&
+        overviewMonthYear &&
+        createPortal(
+          <div
+            className="fixed inset-0 flex items-center justify-center bg-black/50 p-4"
+            style={{ zIndex: 99999 }}
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setSlotsOverviewOpen(false);
+            }}
+          >
+            <div
+              className="relative z-10 w-full max-w-[420px] rounded-xl bg-white shadow-xl overflow-hidden"
+              style={{ pointerEvents: 'auto' }}
+              onClick={(e) => e.stopPropagation()}
+              data-slots-overview-modal
+            >
+              <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+                <h2 className="text-lg font-semibold text-slate-800 m-0">Слоты по дням</h2>
+                <button
+                  type="button"
+                  onClick={() => setSlotsOverviewOpen(false)}
+                  className="rounded p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                  aria-label="Закрыть"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              </div>
+              <div className="p-5">
+                <p className="mb-4 text-center text-lg font-semibold text-slate-800">
+                  {monthNames[overviewMonthYear.month]} {overviewMonthYear.year}
+                </p>
+                <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1.5">
+                  {weekdayShort.map((w) => (
+                    <span key={w}>{w}</span>
+                  ))}
+                </div>
+                <div
+                  className="grid grid-cols-7 gap-1"
+                  style={{ pointerEvents: 'auto' }}
+                  onClick={(e) => {
+                    const el = (e.target as HTMLElement).closest('[data-slot-date]');
+                    if (!el) return;
+                    const dateStr = el.getAttribute('data-slot-date');
+                    if (!dateStr) return;
+                    setSlotsOverviewOpen(false);
+                    calendarRef.current?.getApi().gotoDate(dateStr);
+                  }}
+                >
+                  {buildMonthGrid(overviewMonthYear.year, overviewMonthYear.month).grid.map((day, i) => {
+                    if (day === null) return <div key={i} className="aspect-square min-h-0" />;
+                    const dateStr = `${overviewMonthYear.year}-${String(overviewMonthYear.month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                    const count = overviewCountByDay[dateStr] ?? 0;
+                    return (
+                      <div
+                        key={i}
+                        role="button"
+                        tabIndex={0}
+                        data-slot-date={dateStr}
+                        className="flex aspect-square min-h-[36px] cursor-pointer select-none flex-col items-center justify-center rounded-lg border border-slate-200 bg-slate-50/50 text-[13px] font-medium text-slate-700 hover:border-slate-300 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-300"
+                        title={`Перейти к ${dateStr}`}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            setSlotsOverviewOpen(false);
+                            calendarRef.current?.getApi().gotoDate(dateStr);
+                          }
+                        }}
+                      >
+                        <span>{day}</span>
+                        {count > 0 && (
+                          <span className="mt-0.5 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-emerald-500 px-1 text-[11px] font-bold text-white">
+                            {count}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="mt-5 text-center text-xs text-slate-500">Число в кружке — количество слотов с местами в этот день</p>
+                <button
+                  type="button"
+                  onClick={() => setSlotsOverviewOpen(false)}
+                  className="mt-4 w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Закрыть
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
     </div>
   );
 }
