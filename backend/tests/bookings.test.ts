@@ -111,6 +111,25 @@ describe('Public bookings API', () => {
       .expect(200);
   });
 
+  it('booking with comment is saved and returned in admin list', async () => {
+    const slotId = await getSlotId('w1', '2026-02-08');
+    const payload = { ...validBookingPayload(slotId, 1), comment: 'Хочу торт на стол' };
+    const res = await request(app)
+      .post('/api/public/bookings')
+      .send(payload);
+    expect(res.status).toBe(201);
+    const bookingId = res.body.id;
+
+    const token = await getAdminToken();
+    const listRes = await request(app)
+      .get('/api/admin/bookings')
+      .set('Authorization', 'Bearer ' + token)
+      .expect(200);
+    const booking = listRes.body.find((b: { id: string }) => b.id === bookingId);
+    expect(booking).toBeDefined();
+    expect(booking).toHaveProperty('comment', 'Хочу торт на стол');
+  });
+
   it('cancel confirmed booking returns seats', async () => {
     const slotId = await getSlotId('w1', '2026-02-08');
     const bookRes = await request(app)
