@@ -603,6 +603,21 @@ async function openBookingModal(workshopId) {
     }
     var date = fmtDate(dateObj);
     var time = fmtTime(dateObj);
+    var clickMs = new Date(dateObj).getTime();
+    var overlappingSlot = publicSlotsCache.find(function (s) {
+      var slotStart = new Date(s.startAt || s.date + 'T' + s.time + ':00');
+      var dur = s.durationMinutes != null ? s.durationMinutes : durationMinutes;
+      var slotEnd = new Date(slotStart.getTime() + dur * 60000);
+      return clickMs >= slotStart.getTime() && clickMs < slotEnd.getTime();
+    });
+    if (overlappingSlot) {
+      var errEl = document.getElementById('slotError');
+      if (errEl) {
+        errEl.textContent = 'На это время уже есть слот. Выберите другое свободное время';
+        errEl.style.display = 'block';
+      }
+      return;
+    }
     var existing = publicSlotsCache.find(function (s) { return s.date === date && s.time === time; });
     if (existing) {
       var ev = cal.getEventById(existing.id);
@@ -730,11 +745,27 @@ async function submitBookingForm(e) {
   clearErrors();
 
   let isValid = true;
+  const slotErr = document.getElementById('slotError');
   if (!selectedSlot) {
-    const slotErr = document.getElementById('slotError');
-    slotErr.textContent = 'Пожалуйста, выберите дату и время';
-    slotErr.style.display = 'block';
+    if (slotErr) {
+      slotErr.textContent = 'Пожалуйста, выберите дату и время';
+      slotErr.style.display = 'block';
+    }
     isValid = false;
+  } else if (selectedSlot.isVirtual && publicSlotsCache && publicSlotsCache.length) {
+    var virtualStartMs = new Date(selectedSlot.startAt).getTime();
+    var workshopDur = (selectedWorkshop && selectedWorkshop.durationMinutes != null) ? selectedWorkshop.durationMinutes : 120;
+    var overlaps = publicSlotsCache.some(function (s) {
+      var slotStart = new Date(s.startAt || s.date + 'T' + s.time + ':00');
+      var dur = s.durationMinutes != null ? s.durationMinutes : workshopDur;
+      var slotEnd = new Date(slotStart.getTime() + dur * 60000);
+      return virtualStartMs >= slotStart.getTime() && virtualStartMs < slotEnd.getTime();
+    });
+    if (overlaps && slotErr) {
+      slotErr.textContent = 'На это время уже есть слот. Выберите другое свободное время';
+      slotErr.style.display = 'block';
+      isValid = false;
+    }
   }
   const name = document.getElementById('bookingName').value.trim();
   if (!name) {
