@@ -1,0 +1,75 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Workshop {
+  id               String   @id @default(uuid())
+  title            String
+  description      String
+  durationMinutes  Int
+  capacityPerSlot  Int
+  result           String
+  price            Int
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  slots            Slot[]
+}
+
+model Slot {
+  id         String   @id @default(uuid())
+  workshopId String
+  workshop   Workshop @relation(fields: [workshopId], references: [id], onDelete: Restrict)
+  date       String   // YYYY-MM-DD
+  time       String   // HH:MM
+  capacity   Int      // capacityTotal
+  status     String   @default("OPEN") // OPEN, HELD, CANCELLED
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  bookings   Booking[]
+  seatHolds   SeatHold[]
+
+  @@unique([workshopId, date, time])
+}
+
+model Booking {
+  id           String   @id @default(uuid())
+  workshopId   String
+  slotId       String
+  slot         Slot     @relation(fields: [slotId], references: [id], onDelete: Restrict)
+  name         String
+  phone        String
+  messenger    String
+  participants Int      @default(1)
+  comment      String?
+  status       String   @default("CONFIRMED") // CONFIRMED, PENDING_ADMIN, CANCELLED, REJECTED
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  seatHold     SeatHold?
+}
+
+model SeatHold {
+  id              String    @id @default(uuid())
+  slotId          String
+  slot            Slot      @relation(fields: [slotId], references: [id], onDelete: Restrict)
+  bookingId       String?   @unique
+  booking         Booking?  @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  participantsHeld Int
+  reason          String?
+  expiresAt       DateTime?
+  status          String    @default("ACTIVE") // ACTIVE, RELEASED, EXPIRED
+  createdAt       DateTime  @default(now())
+}
+
+model DateHold {
+  id         String   @id @default(uuid())
+  date       String
+  workshopId String?
+  reason     String?
+  createdAt  DateTime @default(now())
+}

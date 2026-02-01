@@ -1,0 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-slate-50 text-slate-900 antialiased;
+}
+
+/* Равная высота слотов времени в календаре — последний слот не растягивается */
+.fc .fc-timegrid-slot {
+  height: 2.5em !important;
+  min-height: 2.5em !important;
+  max-height: 2.5em !important;
+}
+.fc .fc-timegrid-slot-minor {
+  height: 2.5em !important;
+  min-height: 2.5em !important;
+  max-height: 2.5em !important;
+}
