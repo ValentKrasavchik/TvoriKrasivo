@@ -331,13 +331,11 @@ function renderWorkshops(workshops) {
 function initBookingModal() {
   const modal = document.getElementById('bookingModal');
   const closeBtn = document.getElementById('closeBookingModal');
-  const closeSuccessBtn = document.getElementById('closeSuccessModal');
   const form = document.getElementById('bookingForm');
   const phoneInput = document.getElementById('bookingPhone');
   
   // Закрытие модалки
   closeBtn.addEventListener('click', closeBookingModal);
-  closeSuccessBtn.addEventListener('click', closeBookingModal);
   
   modal.addEventListener('click', (e) => {
     if (e.target === modal) closeBookingModal();
@@ -480,7 +478,6 @@ async function openBookingModal(workshopId) {
   document.getElementById('bookingForm').reset();
   setParticipantsOptions(workshop.maxParticipants || workshop.capacityPerSlot || 6);
   document.getElementById('bookingForm').style.display = 'block';
-  document.getElementById('successState').style.display = 'none';
   clearErrors();
   var slotErr = document.getElementById('slotError');
   if (slotErr) slotErr.style.display = 'none';
@@ -580,8 +577,8 @@ async function openBookingModal(workshopId) {
     cal.getEvents().forEach(function (ev) {
       if (ev.id === eventObj.id) ev.setProp('classNames', ['slot-free', 'slot-selected']);
     });
-    selectedSlot = { id: props.slotId, date: props.date, time: props.time, startAt: props.startAt, isVirtual: false };
-    setParticipantsOptions(props.capacityTotal || selectedWorkshop.maxParticipants || selectedWorkshop.capacityPerSlot || 6);
+    selectedSlot = { id: props.slotId, date: props.date, time: props.time, startAt: props.startAt, isVirtual: false, freeSeats: freeSeats };
+    setParticipantsOptions(freeSeats);
     var errEl2 = document.getElementById('slotError');
     if (errEl2) errEl2.style.display = 'none';
     var hint = document.getElementById('bookingSlotHint');
@@ -685,6 +682,22 @@ async function openBookingModal(workshopId) {
   bookingCalendar.render();
 }
 
+function openSuccessModal() {
+  var modal = document.getElementById('successModal');
+  if (modal) {
+    modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+  }
+}
+
+function closeSuccessModal() {
+  var modal = document.getElementById('successModal');
+  if (modal) {
+    modal.classList.remove('active');
+    document.body.style.overflow = '';
+  }
+}
+
 function closeBookingModal() {
   var calendarEl = document.getElementById('bookingCalendar');
   if (calendarEl && typeof calendarEl._bookingCalendarClickCleanup === 'function') {
@@ -756,9 +769,13 @@ async function submitBookingForm(e) {
     showError('consent', 'Необходимо согласие на обработку данных');
     isValid = false;
   }
+  const participants = parseInt(document.getElementById('bookingParticipants').value, 10) || 1;
+  if (selectedSlot && typeof selectedSlot.freeSeats === 'number' && participants > selectedSlot.freeSeats) {
+    showError('participants', 'Для этого времени доступно максимум ' + selectedSlot.freeSeats + ' мест');
+    isValid = false;
+  }
   if (!isValid) return;
 
-  const participants = parseInt(document.getElementById('bookingParticipants').value, 10) || 1;
   const comment = document.getElementById('bookingComment').value.trim() || null;
   const honeypot = (document.getElementById('bookingHoneypot') && document.getElementById('bookingHoneypot').value) || '';
 
@@ -784,11 +801,11 @@ async function submitBookingForm(e) {
     });
     const data = await res.json().catch(() => ({}));
     if (res.ok || res.status === 202) {
-      document.getElementById('bookingForm').style.display = 'none';
-      document.getElementById('successState').style.display = 'block';
-      var successEl = document.getElementById('successState');
-      var msgEl = successEl && successEl.querySelector('.success-text');
+      closeBookingModal();
+      var msgEl = document.getElementById('successModalText');
       if (res.status === 202 && data.message && msgEl) msgEl.textContent = data.message;
+      else if (msgEl) msgEl.textContent = 'Мы свяжемся с вами в течение 2-3 часов для подтверждения записи.';
+      openSuccessModal();
       return;
     }
     if (res.status === 409) {
@@ -1132,6 +1149,19 @@ function initSlotsOverviewModal() {
   });
 }
 
+function initSuccessModal() {
+  var modal = document.getElementById('successModal');
+  var closeBtn = document.getElementById('closeSuccessModal');
+  if (!modal) return;
+  if (closeBtn) closeBtn.addEventListener('click', closeSuccessModal);
+  modal.addEventListener('click', function (e) {
+    if (e.target === modal) closeSuccessModal();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && modal.classList.contains('active')) closeSuccessModal();
+  });
+}
+
 // ==========================================================================
 // 12. ЗАПУСК ПРИЛОЖЕНИЯ
 // ==========================================================================
@@ -1143,6 +1173,7 @@ async function init() {
   // Инициализируем компоненты
   initNavigation();
   initBookingModal();
+  initSuccessModal();
   initPrivacyModal();
   initSlotsOverviewModal();
 
