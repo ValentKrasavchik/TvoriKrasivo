@@ -411,18 +411,6 @@
             <button type="submit" class="btn btn-primary btn-lg" style="width: 100%;">Отправить заявку</button>
           </div>
         </form>
-        
-        <!-- Успешная отправка -->
-        <div class="success-state" id="successState" style="display: none;">
-          <div class="success-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="20 6 9 17 4 12"/>
-            </svg>
-          </div>
-          <h3 class="success-title">Заявка отправлена!</h3>
-          <p class="success-text">Мы свяжемся с вами в течение 2-3 часов для подтверждения записи.</p>
-          <button class="btn btn-secondary" id="closeSuccessModal">Закрыть</button>
-        </div>
         </div>
       </div>
     </div>
@@ -445,6 +433,20 @@
         <p class="slots-overview-legend">Число в кружке — количество слотов с местами в этот день</p>
         <button type="button" class="btn btn-secondary" id="closeSlotsOverviewBtn">Закрыть</button>
       </div>
+    </div>
+  </div>
+
+  <!-- ========== МОДАЛЬНОЕ ОКНО УСПЕШНОЙ ОТПРАВКИ ========== -->
+  <div class="modal-overlay success-modal" id="successModal" role="dialog" aria-modal="true" aria-labelledby="successModalTitle">
+    <div class="modal success-modal-inner">
+      <div class="success-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+      </div>
+      <h3 class="success-title" id="successModalTitle">Заявка отправлена!</h3>
+      <p class="success-text" id="successModalText">Мы свяжемся с вами в течение 2-3 часов для подтверждения записи.</p>
+      <button type="button" class="btn btn-secondary" id="closeSuccessModal">Закрыть</button>
     </div>
   </div>
 

@@ -1518,16 +1518,24 @@ p {
   }
 }
 
-/* Успешная отправка */
-.success-state {
+/* Успешная отправка — отдельная модалка */
+.success-modal {
+  z-index: 10001;
+}
+.success-modal-inner {
+  width: 100%;
+  max-width: 380px;
+  padding: 2rem 1.5rem;
   text-align: center;
-  padding: 2rem;
+  background-color: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
 }
 
-.success-icon {
-  width: 80px;
-  height: 80px;
-  margin: 0 auto 1.5rem;
+.success-modal .success-icon {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 1rem;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1536,19 +1544,21 @@ p {
   color: #059669;
 }
 
-.success-icon svg {
-  width: 40px;
-  height: 40px;
+.success-modal .success-icon svg {
+  width: 28px;
+  height: 28px;
 }
-
-.success-title {
-  font-size: 1.5rem;
-  margin-bottom: 0.75rem;
+.success-modal .success-title {
+  font-size: 1.25rem;
+  margin: 0 0 0.5rem;
 }
-
-.success-text {
+.success-modal .success-text {
   color: var(--color-text-muted);
-  margin-bottom: 1.5rem;
+  font-size: 0.9375rem;
+  margin: 0 0 1.25rem;
+}
+.success-modal .btn {
+  width: 100%;
 }
 
 /* --------------------------------------------------------------------------
@@ -1681,6 +1691,9 @@ p {
    -------------------------------------------------------------------------- */
 .privacy-modal .modal {
   max-width: 700px;
+  background-color: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
 }
 
 .privacy-content {
