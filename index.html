@@ -344,61 +344,65 @@
           </button>
         </div>
         <div class="modal-body modal__content">
-        <!-- Форма записи -->
         <form id="bookingForm" class="booking-form">
           <div class="booking-form-scroll">
-          <div class="modal-workshop-info" id="modalWorkshopInfo">
-            <!-- Информация о мастер-классе заполняется через JS -->
-          </div>
-          
-          <div class="form-group">
-            <label class="form-label">Выберите время <span class="required">*</span></label>
-            <div class="booking-calendar-legend">
-              <span class="legend-item legend-free"><span class="legend-dot"></span> Свободно</span>
-              <span class="legend-item legend-busy"><span class="legend-dot"></span> Занято</span>
+            <!-- Шаг 1: выбор времени -->
+            <div class="booking-step booking-step--time" id="bookingStep1" data-step="1">
+              <p class="booking-step-label">Шаг 1 из 2</p>
+              <div class="modal-workshop-info" id="modalWorkshopInfo"></div>
+              <div class="form-group form-group--calendar">
+                <label class="form-label">Выберите время <span class="required">*</span></label>
+                <div class="booking-calendar-legend">
+                  <span class="legend-item legend-free"><span class="legend-dot"></span> Свободно</span>
+                  <span class="legend-item legend-busy"><span class="legend-dot"></span> Занято</span>
+                </div>
+                <p class="booking-calendar-hint" id="bookingSlotHint" aria-live="polite">Нажмите на зелёный слот в календаре, чтобы выбрать время</p>
+                <div id="bookingCalendar" class="booking-calendar-container"></div>
+                <p class="form-error" id="slotError" style="display: none;">Пожалуйста, выберите время</p>
+              </div>
+              <div class="booking-step-footer">
+                <button type="button" class="btn btn-primary btn-lg booking-step-next" id="bookingStep1Next">Далее</button>
+              </div>
             </div>
-            <p class="booking-calendar-hint" id="bookingSlotHint" aria-live="polite">Нажмите на зелёный слот в календаре, чтобы выбрать время</p>
-            <div id="bookingCalendar" class="booking-calendar-container"></div>
-            <p class="form-error" id="slotError" style="display: none;">Пожалуйста, выберите время</p>
+
+            <!-- Шаг 2: контактные данные -->
+            <div class="booking-step booking-step--data" id="bookingStep2" data-step="2" hidden>
+              <p class="booking-step-label">Шаг 2 из 2</p>
+              <button type="button" class="booking-step-back" id="bookingStep2Back">← Изменить время</button>
+              <div class="booking-selected-summary-inline" id="bookingSelectedSummaryInline" aria-live="polite"></div>
+              <div class="form-group">
+                <label class="form-label" for="bookingName">Ваше имя <span class="required">*</span></label>
+                <input type="text" class="form-input" id="bookingName" name="name" required placeholder="Как к вам обращаться?">
+                <p class="form-error" id="nameError" style="display: none;"></p>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="bookingPhone">Телефон <span class="required">*</span></label>
+                <input type="tel" class="form-input" id="bookingPhone" name="phone" required placeholder="+7 (___) ___-__-__">
+                <p class="form-error" id="phoneError" style="display: none;"></p>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="bookingMessenger">Как с вами связаться? <span class="required">*</span></label>
+                <select class="form-select" id="bookingMessenger" name="messenger" required>
+                  <option value="">Выберите способ связи</option>
+                  <option value="telegram">Telegram</option>
+                  <option value="whatsapp">WhatsApp</option>
+                  <option value="call">Позвонить</option>
+                </select>
+                <p class="form-error" id="messengerError" style="display: none;"></p>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="bookingParticipants">Количество участников</label>
+                <select class="form-select" id="bookingParticipants" name="participants"></select>
+                <p class="form-error" id="participantsError" style="display: none;"></p>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="bookingComment">Комментарий</label>
+                <textarea class="form-textarea" id="bookingComment" name="comment" placeholder="Особые пожелания или вопросы..."></textarea>
+              </div>
+            </div>
           </div>
-          <!-- Honeypot: скрытое поле против ботов -->
           <input type="text" name="website" id="bookingHoneypot" style="position:absolute;left:-9999px;opacity:0" tabindex="-1" autocomplete="off" aria-hidden="true">
-          
-          <div class="form-group">
-            <label class="form-label" for="bookingName">Ваше имя <span class="required">*</span></label>
-            <input type="text" class="form-input" id="bookingName" name="name" required placeholder="Как к вам обращаться?">
-            <p class="form-error" id="nameError" style="display: none;"></p>
-          </div>
-          
-          <div class="form-group">
-            <label class="form-label" for="bookingPhone">Телефон <span class="required">*</span></label>
-            <input type="tel" class="form-input" id="bookingPhone" name="phone" required placeholder="+7 (___) ___-__-__">
-            <p class="form-error" id="phoneError" style="display: none;"></p>
-          </div>
-          
-          <div class="form-group">
-            <label class="form-label" for="bookingMessenger">Как с вами связаться? <span class="required">*</span></label>
-            <select class="form-select" id="bookingMessenger" name="messenger" required>
-              <option value="">Выберите способ связи</option>
-              <option value="telegram">Telegram</option>
-              <option value="whatsapp">WhatsApp</option>
-              <option value="call">Позвонить</option>
-            </select>
-            <p class="form-error" id="messengerError" style="display: none;"></p>
-          </div>
-          
-          <div class="form-group">
-            <label class="form-label" for="bookingParticipants">Количество участников</label>
-            <select class="form-select" id="bookingParticipants" name="participants"></select>
-            <p class="form-error" id="participantsError" style="display: none;"></p>
-          </div>
-          
-          <div class="form-group">
-            <label class="form-label" for="bookingComment">Комментарий</label>
-            <textarea class="form-textarea" id="bookingComment" name="comment" placeholder="Особые пожелания или вопросы..."></textarea>
-          </div>
-          </div>
-          <div class="booking-form-footer">
+          <div class="booking-form-footer" id="bookingFormFooter" hidden>
             <div class="form-group">
               <label class="form-checkbox">
                 <input type="checkbox" id="bookingConsent" name="consent" required>

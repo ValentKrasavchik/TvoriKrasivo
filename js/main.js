@@ -353,6 +353,28 @@ function initBookingModal() {
   
   // Отправка формы
   form.addEventListener('submit', submitBookingForm);
+
+  // Два этапа: шаг 1 — время, шаг 2 — данные
+  var step1Next = document.getElementById('bookingStep1Next');
+  var step2Back = document.getElementById('bookingStep2Back');
+  if (step1Next) {
+    step1Next.addEventListener('click', function () {
+      if (!selectedSlot) {
+        var errEl = document.getElementById('slotError');
+        if (errEl) {
+          errEl.textContent = 'Пожалуйста, выберите время';
+          errEl.style.display = 'block';
+        }
+        return;
+      }
+      showBookingStep(2);
+    });
+  }
+  if (step2Back) {
+    step2Back.addEventListener('click', function () {
+      showBookingStep(1);
+    });
+  }
 }
 
 function getDateRange(daysBack, daysForward) {
@@ -376,6 +398,70 @@ function addMinutes(isoString, minutes) {
 
 function isSmallScreen() {
   return typeof window !== 'undefined' && window.innerWidth < 768;
+}
+
+/** Формат даты коротко: "Пн, 2 фев" */
+function formatDateShort(dateStr) {
+  if (!dateStr) return '';
+  var d = new Date(dateStr + 'T12:00:00');
+  if (isNaN(d.getTime())) return dateStr;
+  var wd = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+  var mon = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+  return wd[d.getDay()] + ', ' + d.getDate() + ' ' + mon[d.getMonth()];
+}
+
+/** Время слота "12:00–14:00" по startAt и длительности в минутах */
+function formatTimeRange(startAt, durationMinutes) {
+  if (!startAt) return '';
+  var start = new Date(startAt);
+  var end = new Date(start.getTime() + (durationMinutes || 120) * 60000);
+  function pad2(n) { return String(n).padStart(2, '0'); }
+  return pad2(start.getHours()) + ':' + pad2(start.getMinutes()) + '–' + pad2(end.getHours()) + ':' + pad2(end.getMinutes());
+}
+
+/** Показать шаг 1 или 2 модалки записи */
+function showBookingStep(step) {
+  var step1 = document.getElementById('bookingStep1');
+  var step2 = document.getElementById('bookingStep2');
+  var footer = document.getElementById('bookingFormFooter');
+  var modalEl = document.querySelector('#bookingModal .modal');
+  if (!step1 || !step2) return;
+  if (step === 1) {
+    step1.hidden = false;
+    step2.hidden = true;
+    if (footer) footer.hidden = true;
+    if (modalEl) modalEl.classList.remove('modal--step2');
+    updateBookingStep1NextState();
+  } else {
+    step1.hidden = true;
+    step2.hidden = false;
+    if (footer) footer.hidden = false;
+    if (modalEl) modalEl.classList.add('modal--step2');
+    updateBookingSelectedSummaryInline();
+  }
+}
+
+/** Скрыть ошибку слота при выборе времени (кнопка "Далее" всегда активна, ошибка показывается при клике без выбора) */
+function updateBookingStep1NextState() {
+  var errEl = document.getElementById('slotError');
+  if (errEl && selectedSlot) errEl.style.display = 'none';
+}
+
+/** Краткий текст выбранного слота для шага 2 */
+function formatSelectedSlotSummary() {
+  if (!selectedSlot) return '';
+  var dateStr = selectedSlot.date;
+  var durationMinutes = selectedWorkshop && selectedWorkshop.durationMinutes != null ? selectedWorkshop.durationMinutes : 120;
+  var startAt = selectedSlot.startAt || (dateStr && selectedSlot.time ? dateStr + 'T' + selectedSlot.time + ':00' : null);
+  var range = startAt ? formatTimeRange(startAt, durationMinutes) : (selectedSlot.time || '');
+  var places = typeof selectedSlot.freeSeats === 'number' ? selectedSlot.freeSeats : '?';
+  return formatDateShort(dateStr) + ' · ' + range + ' (' + places + ' мест)';
+}
+
+function updateBookingSelectedSummaryInline() {
+  var el = document.getElementById('bookingSelectedSummaryInline');
+  if (!el) return;
+  el.textContent = selectedSlot ? 'Вы выбрали: ' + formatSelectedSlotSummary() : '';
 }
 
 function openSlotsOverviewModal() {
@@ -485,6 +571,7 @@ async function openBookingModal(workshopId) {
   if (hintEl) hintEl.textContent = 'Выберите время в календаре (можно кликать по пустым клеткам)';
   modal.classList.add('active');
   document.body.style.overflow = 'hidden';
+  showBookingStep(1);
 
   const { dateFrom, dateTo } = getDateRange(7, 60);
   const slotsUrl = `${API_BASE}/api/public/slots?workshopId=${encodeURIComponent(workshopId)}&dateFrom=${dateFrom}&dateTo=${dateTo}`;
@@ -526,9 +613,10 @@ async function openBookingModal(workshopId) {
   var events = publicSlotsCache.map(function (s) {
     var start = new Date(s.startAt || s.date + 'T' + s.time + ':00');
     var end = addMinutesLocal(start, s.durationMinutes != null ? s.durationMinutes : durationMinutes);
-    var free = s.freeSeats != null ? s.freeSeats : 0;
+    var free = Number(s.freeSeats);
+    if (isNaN(free)) free = 0;
     var cap = s.capacityTotal != null ? s.capacityTotal : (s.capacity || 6);
-    var isBusy = free <= 0 || (s.status && s.status !== 'OPEN');
+    var isBusy = free <= 0 || String(s.status || '').toUpperCase() !== 'OPEN';
     return {
       id: s.id,
       title: isBusy ? 'Нет мест' : 'Свободно: ' + free + '/' + cap,
@@ -554,16 +642,19 @@ async function openBookingModal(workshopId) {
     cal.getEvents().forEach(function (ev) {
       if (ev.id === '__virtual_selection__') return;
       var p = ev.extendedProps || {};
-      var busy = (typeof p.freeSeats === 'number' ? p.freeSeats : 0) <= 0 || (p.status && p.status !== 'OPEN');
+      var free = Number(p.freeSeats);
+      if (isNaN(free)) free = 0;
+      var busy = free <= 0 || String(p.status || '').toUpperCase() !== 'OPEN';
       ev.setProp('classNames', busy ? ['slot-busy'] : ['slot-free']);
     });
   }
 
   function selectExistingEvent(eventObj) {
     var props = eventObj.extendedProps || {};
-    var freeSeats = typeof props.freeSeats === 'number' ? props.freeSeats : 0;
-    var status = props.status || 'OPEN';
-    if (freeSeats <= 0 || status !== 'OPEN') {
+    var freeSeats = Number(props.freeSeats);
+    if (isNaN(freeSeats)) freeSeats = 0;
+    var statusOpen = String(props.status || '').toUpperCase() === 'OPEN';
+    if (freeSeats <= 0 || !statusOpen) {
       var errEl = document.getElementById('slotError');
       if (errEl) {
         errEl.textContent = 'Это время недоступно. Выберите другое.';
@@ -583,6 +674,7 @@ async function openBookingModal(workshopId) {
     if (errEl2) errEl2.style.display = 'none';
     var hint = document.getElementById('bookingSlotHint');
     if (hint) hint.textContent = 'Выбрано: ' + (props.date || '') + ' ' + (props.time || '');
+    updateBookingStep1NextState();
   }
 
   function selectVirtualByDate(dateObj) {
@@ -622,6 +714,7 @@ async function openBookingModal(workshopId) {
     if (errEl2) errEl2.style.display = 'none';
     var hint = document.getElementById('bookingSlotHint');
     if (hint) hint.textContent = 'Выбрано: ' + date + ' ' + time;
+    updateBookingStep1NextState();
   }
 
   if (bookingCalendar) {
@@ -672,9 +765,9 @@ async function openBookingModal(workshopId) {
     eventClassNames: function (arg) {
       var props = arg.event.extendedProps || {};
       if (props.isVirtual === true) return ['slot-free', 'slot-selected'];
-      var free = typeof props.freeSeats === 'number' ? props.freeSeats : 0;
-      var st = props.status || 'OPEN';
-      var busy = free <= 0 || st !== 'OPEN';
+      var free = Number(props.freeSeats);
+      if (isNaN(free)) free = 0;
+      var busy = free <= 0 || String(props.status || '').toUpperCase() !== 'OPEN';
       return busy ? ['slot-busy'] : ['slot-free'];
     },
   });
@@ -710,6 +803,8 @@ function closeBookingModal() {
   }
   selectedSlot = null;
   selectedWorkshop = null;
+  var modalEl = document.querySelector('#bookingModal .modal');
+  if (modalEl) modalEl.classList.remove('modal--step2');
   const modal = document.getElementById('bookingModal');
   modal.classList.remove('active');
   document.body.style.overflow = '';
