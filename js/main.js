@@ -46,6 +46,42 @@ let publicSlotsCache = [];
 /** Экземпляр FullCalendar в модалке записи */
 let bookingCalendar = null;
 
+/** Проверка: выбранный слот доступен (не занят, не HELD). cache = publicSlotsCache, durationMinutes — длительность мастер-класса. */
+function isSelectedSlotAvailable(cache, selectedSlot, durationMinutes) {
+  if (!selectedSlot || !Array.isArray(cache)) return false;
+  var dur = Math.max(1, parseInt(durationMinutes, 10) || 120);
+  function timeToMinutes(t) {
+    var parts = (t || '').split(':');
+    return (parseInt(parts[0], 10) || 0) * 60 + (parseInt(parts[1], 10) || 0);
+  }
+  if (selectedSlot.id) {
+    var byId = cache.find(function (s) { return s.id === selectedSlot.id; });
+    if (!byId) return false;
+    var f = Number(byId.freeSeats);
+    if (isNaN(f)) f = 0;
+    return f > 0 && String(byId.status || '').toUpperCase() === 'OPEN';
+  }
+  var date = selectedSlot.date;
+  var time = selectedSlot.time;
+  if (!date || !time) return false;
+  var exact = cache.find(function (s) { return s.date === date && s.time === time; });
+  if (exact) {
+    var fe = Number(exact.freeSeats);
+    if (isNaN(fe)) fe = 0;
+    if (fe <= 0 || String(exact.status || '').toUpperCase() !== 'OPEN') return false;
+  }
+  var selectedStartMin = timeToMinutes(time);
+  var selectedEndMin = selectedStartMin + dur;
+  var overlappingSlot = cache.find(function (s) {
+    if (s.date !== date) return false;
+    var slotStartMin = timeToMinutes(s.time);
+    var slotDur = Math.max(0, parseInt(s.durationMinutes, 10) || dur);
+    var slotEndMin = slotStartMin + slotDur;
+    return selectedEndMin > slotStartMin && slotEndMin > selectedStartMin;
+  });
+  return !overlappingSlot;
+}
+
 // ==========================================================================
 // 2. УТИЛИТЫ
 // ==========================================================================
@@ -367,6 +403,15 @@ function initBookingModal() {
         }
         return;
       }
+      var dur = selectedWorkshop && (selectedWorkshop.durationMinutes != null) ? selectedWorkshop.durationMinutes : 120;
+      if (!isSelectedSlotAvailable(publicSlotsCache, selectedSlot, dur)) {
+        var errSlot = document.getElementById('slotError');
+        if (errSlot) {
+          errSlot.textContent = 'Это время недоступно. Выберите другое.';
+          errSlot.style.display = 'block';
+        }
+        return;
+      }
       showBookingStep(2);
     });
   }
@@ -651,17 +696,36 @@ async function openBookingModal(workshopId) {
 
   function selectExistingEvent(eventObj) {
     var props = eventObj.extendedProps || {};
-    var freeSeats = Number(props.freeSeats);
-    if (isNaN(freeSeats)) freeSeats = 0;
-    var statusOpen = String(props.status || '').toUpperCase() === 'OPEN';
-    if (freeSeats <= 0 || !statusOpen) {
-      var errEl = document.getElementById('slotError');
-      if (errEl) {
-        errEl.textContent = 'Это время недоступно. Выберите другое.';
-        errEl.style.display = 'block';
+    var slotId = props.slotId;
+    var date = props.date;
+    var time = props.time;
+    var cached = slotId ? publicSlotsCache.find(function (s) { return s.id === slotId; })
+      : (date && time ? publicSlotsCache.find(function (s) { return s.date === date && s.time === time; }) : null);
+    if (cached) {
+      var free = Number(cached.freeSeats);
+      if (isNaN(free)) free = 0;
+      if (free <= 0 || String(cached.status || '').toUpperCase() !== 'OPEN') {
+        var errEl = document.getElementById('slotError');
+        if (errEl) {
+          errEl.textContent = 'Это время недоступно. Выберите другое.';
+          errEl.style.display = 'block';
+        }
+        return;
       }
-      return;
+    } else {
+      var freeFromProps = Number(props.freeSeats);
+      if (isNaN(freeFromProps)) freeFromProps = 0;
+      var statusOpen = String(props.status || '').toUpperCase() === 'OPEN';
+      if (freeFromProps <= 0 || !statusOpen) {
+        var errEl2 = document.getElementById('slotError');
+        if (errEl2) {
+          errEl2.textContent = 'Это время недоступно. Выберите другое.';
+          errEl2.style.display = 'block';
+        }
+        return;
+      }
     }
+    var freeSeats = cached ? free : (Number(props.freeSeats) || 0);
     var cal = bookingCalendar;
     if (!cal) return;
     clearSelectionVisual(cal);
@@ -692,11 +756,76 @@ async function openBookingModal(workshopId) {
     }
     var date = fmtDate(dateObj);
     var time = fmtTime(dateObj);
-    var existing = publicSlotsCache.find(function (s) { return s.date === date && s.time === time; });
+
+    function timeToMinutes(t) {
+      var parts = (t || '').split(':');
+      var h = parseInt(parts[0], 10) || 0;
+      var m = parseInt(parts[1], 10) || 0;
+      return h * 60 + m;
+    }
+    function rangesOverlap(selectedStartMin, selectedEndMin, slot) {
+      if (slot.date !== date) return false;
+      var slotStartMin = timeToMinutes(slot.time);
+      var slotDur = Math.max(0, parseInt(slot.durationMinutes, 10) || durationMinutes);
+      var slotEndMin = slotStartMin + slotDur;
+      return selectedEndMin > slotStartMin && slotEndMin > selectedStartMin;
+    }
+
+    var clickMin = timeToMinutes(time);
+    var selectedEndMin = clickMin + durationMinutes;
+    var clickMs = new Date(dateObj).getTime();
+
+    var existing = publicSlotsCache.find(function (s) {
+      if (s.date !== date) return false;
+      return timeToMinutes(s.time) === clickMin;
+    });
     if (existing) {
+      var free = Number(existing.freeSeats);
+      if (isNaN(free)) free = 0;
+      var slotStatus = String(existing.status || '').toUpperCase();
+      if (free <= 0 || slotStatus !== 'OPEN') {
+        var errElUnavail = document.getElementById('slotError');
+        if (errElUnavail) {
+          errElUnavail.textContent = 'Это время недоступно. Выберите другое.';
+          errElUnavail.style.display = 'block';
+        }
+        return;
+      }
       var ev = cal.getEventById(existing.id);
       if (ev) return selectExistingEvent(ev);
+    } else {
+      var overlappingSlot = publicSlotsCache.find(function (s) {
+        return rangesOverlap(clickMin, selectedEndMin, s);
+      });
+      if (overlappingSlot) {
+        var errElOver = document.getElementById('slotError');
+        if (errElOver) {
+          errElOver.textContent = 'Это время недоступно. Выберите другое.';
+          errElOver.style.display = 'block';
+        }
+        return;
+      }
     }
+
+    var selectedEndMs = addMinutesLocal(dateObj, durationMinutes).getTime();
+    var allEvents = cal.getEvents();
+    for (var i = 0; i < allEvents.length; i++) {
+      var ev = allEvents[i];
+      if (ev.id === '__virtual_selection__') continue;
+      var p = ev.extendedProps || {};
+      if (p.isVirtual === true) continue;
+      var startMs = ev.start ? new Date(ev.start).getTime() : 0;
+      var endMs = ev.end ? new Date(ev.end).getTime() : 0;
+      if (selectedEndMs > startMs && endMs > clickMs) {
+        var errElBusy = document.getElementById('slotError');
+        if (errElBusy) {
+          errElBusy.textContent = 'Это время недоступно. Выберите другое.';
+          errElBusy.style.display = 'block';
+        }
+        return;
+      }
+    }
+
     clearSelectionVisual(cal);
     var end = addMinutesLocal(dateObj, durationMinutes);
     cal.addEvent({
@@ -843,6 +972,14 @@ async function submitBookingForm(e) {
     slotErr.textContent = 'Пожалуйста, выберите дату и время';
     slotErr.style.display = 'block';
     isValid = false;
+  } else {
+    var dur = selectedWorkshop && (selectedWorkshop.durationMinutes != null) ? selectedWorkshop.durationMinutes : 120;
+    if (!isSelectedSlotAvailable(publicSlotsCache, selectedSlot, dur)) {
+      const slotErr = document.getElementById('slotError');
+      slotErr.textContent = 'Это время недоступно. Выберите другое.';
+      slotErr.style.display = 'block';
+      isValid = false;
+    }
   }
   const name = document.getElementById('bookingName').value.trim();
   if (!name) {
