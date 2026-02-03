@@ -63,6 +63,17 @@ adminRouter.get('/workshops', async (_req: Request, res: Response) => {
   }
 });
 
+adminRouter.get('/workshops/:id', async (req: Request, res: Response) => {
+  try {
+    const w = await prisma.workshop.findUnique({ where: { id: req.params.id } });
+    if (!w) return res.status(404).json({ error: 'Workshop not found' });
+    res.json(w);
+  } catch (e) {
+    console.error('GET /api/admin/workshops/:id', e);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 adminRouter.post('/workshops', async (req: Request, res: Response) => {
   try {
     const { title, description, durationMinutes, capacityPerSlot, result, price, isActive, imageUrl } = req.body || {};
@@ -102,7 +113,8 @@ adminRouter.patch('/workshops/:id', async (req: Request, res: Response) => {
     if (body.isActive !== undefined) data.isActive = Boolean(body.isActive);
     const w = await prisma.workshop.update({ where: { id: req.params.id }, data });
     res.json(w);
-  } catch (e) {
+  } catch (e: any) {
+    if (e?.code === 'P2025') return res.status(404).json({ error: 'Workshop not found' });
     console.error('PATCH /api/admin/workshops/:id', e);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -110,10 +122,21 @@ adminRouter.patch('/workshops/:id', async (req: Request, res: Response) => {
 
 adminRouter.delete('/workshops/:id', async (req: Request, res: Response) => {
   try {
-    await prisma.workshop.delete({ where: { id: req.params.id } });
+    const workshopId = req.params.id;
+    await prisma.$transaction(async (tx) => {
+      const slots = await tx.slot.findMany({ where: { workshopId }, select: { id: true } });
+      for (const slot of slots) {
+        // Порядок важен для FK: сначала холды (ссылаются на slot и booking), потом брони, потом слот
+        await tx.seatHold.deleteMany({ where: { slotId: slot.id } });
+        await tx.booking.deleteMany({ where: { slotId: slot.id } });
+        await tx.slot.delete({ where: { id: slot.id } });
+      }
+      await tx.workshop.delete({ where: { id: workshopId } });
+    });
     res.status(204).send();
-  } catch (e) {
-    console.error('DELETE /api/admin/workshops/:id', e);
+  } catch (e: any) {
+    if (e?.code === 'P2025') return res.status(404).json({ error: 'Workshop not found' });
+    console.error('DELETE /api/admin/workshops/:id', e?.message ?? e);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
