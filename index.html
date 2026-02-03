@@ -360,9 +360,6 @@
                 <div id="bookingCalendar" class="booking-calendar-container"></div>
                 <p class="form-error" id="slotError" style="display: none;">Пожалуйста, выберите время</p>
               </div>
-              <div class="booking-step-footer">
-                <button type="button" class="btn btn-primary btn-lg booking-step-next" id="bookingStep1Next">Далее</button>
-              </div>
             </div>
 
             <!-- Шаг 2: контактные данные -->
@@ -400,6 +397,9 @@
                 <textarea class="form-textarea" id="bookingComment" name="comment" placeholder="Особые пожелания или вопросы..."></textarea>
               </div>
             </div>
+          </div>
+          <div class="booking-next-overlay" id="bookingNextOverlay">
+            <button type="button" class="btn btn-primary btn-lg booking-step-next" id="bookingStep1Next">Далее</button>
           </div>
           <input type="text" name="website" id="bookingHoneypot" style="position:absolute;left:-9999px;opacity:0" tabindex="-1" autocomplete="off" aria-hidden="true">
           <div class="booking-form-footer" id="bookingFormFooter" hidden>
@@ -520,6 +520,6 @@
   </script>
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.5/main.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.5/locales/ru.min.js"></script>
-  <script src="js/main.js"></script>
+  <script src="js/main.js?v=2"></script>
 </body>
 </html>

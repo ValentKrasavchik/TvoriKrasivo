@@ -445,6 +445,76 @@ function isSmallScreen() {
   return typeof window !== 'undefined' && window.innerWidth < 768;
 }
 
+function isLowHeightScreen() {
+  return typeof window !== 'undefined' && window.innerHeight <= 820;
+}
+
+function getBookingScrollContainer() {
+  var modal = document.getElementById('bookingModal');
+  if (!modal) return null;
+  return modal.querySelector('.booking-form-scroll');
+}
+
+function updateBookingScrollBehavior() {
+  var container = getBookingScrollContainer();
+  if (!container) return;
+  var modalEl = document.querySelector('#bookingModal .modal');
+  var isMobile = typeof window !== 'undefined' && window.innerWidth <= 767;
+  if (isMobile && modalEl && modalEl.classList.contains('modal--step2')) {
+    modalEl.style.overflowY = 'auto';
+    modalEl.style.webkitOverflowScrolling = 'touch';
+    container.style.overflow = 'visible';
+    return;
+  }
+  if (modalEl) {
+    modalEl.style.overflowY = '';
+  }
+  container.style.overflow = '';
+  var shouldScroll = container.scrollHeight > container.clientHeight + 1;
+  container.style.overflowY = shouldScroll ? 'auto' : 'hidden';
+  container.classList.toggle('is-scrollable', shouldScroll);
+}
+
+function isElementVisible(el) {
+  if (!el) return false;
+  if (el.getClientRects().length === 0) return false;
+  var style = window.getComputedStyle(el);
+  return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+}
+
+function scrollIntoContainerView(container, targetEl) {
+  if (!container || !targetEl) return;
+  var containerRect = container.getBoundingClientRect();
+  var targetRect = targetEl.getBoundingClientRect();
+  var padding = 12;
+
+  if (targetRect.top < containerRect.top + padding) {
+    var offsetTop = targetRect.top - containerRect.top + container.scrollTop;
+    container.scrollTo({ top: Math.max(0, offsetTop - padding), behavior: 'smooth' });
+    return;
+  }
+
+  if (targetRect.bottom > containerRect.bottom - padding) {
+    var offsetBottom = targetRect.bottom - containerRect.bottom;
+    container.scrollTo({ top: container.scrollTop + offsetBottom + padding, behavior: 'smooth' });
+  }
+}
+
+function scrollToFirstInvalidField() {
+  var form = document.getElementById('bookingForm');
+  var container = getBookingScrollContainer();
+  if (!form || !container) return;
+  var candidates = form.querySelectorAll('.form-error, .form-input.error, .form-select.error');
+  for (var i = 0; i < candidates.length; i++) {
+    var el = candidates[i];
+    if (el.classList.contains('form-error') && el.style.display === 'none') continue;
+    if (!isElementVisible(el)) continue;
+    var target = el.closest('.form-group') || el;
+    scrollIntoContainerView(container, target);
+    break;
+  }
+}
+
 /** Формат даты коротко: "Пн, 2 фев" */
 function formatDateShort(dateStr) {
   if (!dateStr) return '';
@@ -477,11 +547,54 @@ function showBookingStep(step) {
     if (footer) footer.hidden = true;
     if (modalEl) modalEl.classList.remove('modal--step2');
     updateBookingStep1NextState();
+    requestAnimationFrame(updateBookingScrollBehavior);
   } else {
     step1.hidden = true;
     step2.hidden = false;
     if (footer) footer.hidden = false;
     if (modalEl) modalEl.classList.add('modal--step2');
+    if (isLowHeightScreen()) {
+      var container = getBookingScrollContainer();
+      if (container) container.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    requestAnimationFrame(updateBookingScrollBehavior);
+    // Ограничить количество участников по свободным местам в выбранном слоте (1, 2, 3... до freeSeats)
+    var freeSeats = selectedSlot && typeof selectedSlot.freeSeats === 'number' ? selectedSlot.freeSeats : null;
+    if (freeSeats == null && selectedSlot && publicSlotsCache && publicSlotsCache.length > 0) {
+      var cached = null;
+      if (selectedSlot.id) {
+        cached = publicSlotsCache.find(function (s) { return s.id === selectedSlot.id; });
+      }
+      if (!cached && selectedSlot.date) {
+        var normTime = function (t) {
+          if (!t) return '';
+          var p = String(t).split(':');
+          var h = parseInt(p[0], 10) || 0;
+          var m = parseInt(p[1], 10) || 0;
+          return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+        };
+        var selTime = normTime(selectedSlot.time);
+        cached = publicSlotsCache.find(function (s) {
+          return s.date === selectedSlot.date && normTime(s.time) === selTime;
+        });
+      }
+      if (!cached && selectedSlot.date && selectedSlot.time) {
+        cached = publicSlotsCache.find(function (s) { return s.date === selectedSlot.date && s.time === selectedSlot.time; });
+      }
+      if (!cached && selectedSlot.startAt) {
+        cached = publicSlotsCache.find(function (s) {
+          var slotStart = s.startAt || (s.date && s.time ? s.date + 'T' + s.time + ':00' : '');
+          return slotStart && selectedSlot.startAt && slotStart.slice(0, 16) === selectedSlot.startAt.slice(0, 16);
+        });
+      }
+      if (!cached && selectedSlot.date) {
+        cached = publicSlotsCache.find(function (s) { return s.date === selectedSlot.date; });
+      }
+      if (cached) freeSeats = typeof cached.freeSeats === 'number' ? cached.freeSeats : null;
+    }
+    if (freeSeats != null && freeSeats > 0) {
+      setParticipantsOptions(freeSeats);
+    }
     updateBookingSelectedSummaryInline();
   }
 }
@@ -617,6 +730,7 @@ async function openBookingModal(workshopId) {
   modal.classList.add('active');
   document.body.style.overflow = 'hidden';
   showBookingStep(1);
+  requestAnimationFrame(updateBookingScrollBehavior);
 
   const { dateFrom, dateTo } = getDateRange(7, 60);
   const slotsUrl = `${API_BASE}/api/public/slots?workshopId=${encodeURIComponent(workshopId)}&dateFrom=${dateFrom}&dateTo=${dateTo}`;
@@ -798,11 +912,37 @@ async function openBookingModal(workshopId) {
         return rangesOverlap(clickMin, selectedEndMin, s);
       });
       if (overlappingSlot) {
-        var errElOver = document.getElementById('slotError');
-        if (errElOver) {
-          errElOver.textContent = 'Это время недоступно. Выберите другое.';
-          errElOver.style.display = 'block';
+        var freeOver = Number(overlappingSlot.freeSeats);
+        if (isNaN(freeOver)) freeOver = 0;
+        var statusOver = String(overlappingSlot.status || '').toUpperCase();
+        if (freeOver <= 0 || statusOver !== 'OPEN') {
+          var errElOver = document.getElementById('slotError');
+          if (errElOver) {
+            errElOver.textContent = 'Это время недоступно. Выберите другое.';
+            errElOver.style.display = 'block';
+          }
+          return;
         }
+        var evOver = cal.getEventById(overlappingSlot.id);
+        if (evOver) return selectExistingEvent(evOver);
+        selectedSlot = {
+          id: overlappingSlot.id,
+          date: overlappingSlot.date,
+          time: overlappingSlot.time,
+          startAt: overlappingSlot.startAt || (overlappingSlot.date + 'T' + (overlappingSlot.time || '12:00') + ':00'),
+          isVirtual: false,
+          freeSeats: freeOver
+        };
+        setParticipantsOptions(freeOver);
+        clearSelectionVisual(cal);
+        cal.getEvents().forEach(function (ev) {
+          if (ev.id === overlappingSlot.id) ev.setProp('classNames', ['slot-free', 'slot-selected']);
+        });
+        var errEl2 = document.getElementById('slotError');
+        if (errEl2) errEl2.style.display = 'none';
+        var hint = document.getElementById('bookingSlotHint');
+        if (hint) hint.textContent = 'Выбрано: ' + overlappingSlot.date + ' ' + overlappingSlot.time;
+        updateBookingStep1NextState();
         return;
       }
     }
@@ -854,7 +994,7 @@ async function openBookingModal(workshopId) {
   var initialView = isSmallScreen() ? 'timeGridDay' : 'timeGridWeek';
   bookingCalendar = new FullCalendar.Calendar(calendarEl, {
     initialView: initialView,
-    height: '100%',
+    height: 'auto',
     expandRows: true,
     stickyHeaderDates: true,
     handleWindowResize: true,
@@ -902,6 +1042,7 @@ async function openBookingModal(workshopId) {
   });
 
   bookingCalendar.render();
+  requestAnimationFrame(updateBookingScrollBehavior);
 }
 
 function openSuccessModal() {
@@ -1006,7 +1147,10 @@ async function submitBookingForm(e) {
     showError('participants', 'Для этого времени доступно максимум ' + selectedSlot.freeSeats + ' мест');
     isValid = false;
   }
-  if (!isValid) return;
+  if (!isValid) {
+    if (isLowHeightScreen()) scrollToFirstInvalidField();
+    return;
+  }
 
   const comment = document.getElementById('bookingComment').value.trim() || null;
   const honeypot = (document.getElementById('bookingHoneypot') && document.getElementById('bookingHoneypot').value) || '';

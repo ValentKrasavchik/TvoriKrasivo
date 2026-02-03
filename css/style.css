@@ -1096,6 +1096,12 @@ p {
   overflow-y: auto;
 }
 
+#bookingModal .modal {
+  display: flex;
+  flex-direction: column;
+  max-height: 100dvh;
+}
+
 .modal--booking {
   position: relative;
   z-index: 10000;
@@ -1103,8 +1109,8 @@ p {
   flex-direction: column;
   width: 100%;
   max-width: 720px;
-  height: 90vh;
-  max-height: 90vh;
+  height: auto;
+  max-height: calc(100dvh - 40px);
   overflow: hidden;
   background-color: var(--color-surface);
   border-radius: var(--radius-lg);
@@ -1122,26 +1128,27 @@ p {
   padding: 0;
 }
 
-/* ===== Booking modal must have a constrained height to enable inner scrolling ===== */
-/* Окно модалки: .modal--booking; контент: .modal-body (без modal__dialog/modal__content) */
-
-.modal--booking {
-  max-height: 90vh;
-  height: 90vh;
-}
-
-.modal--booking .modal-body {
+.modal--booking .modal__dialog {
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.modal--booking .modal__content {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow: hidden;
 }
 
-/* ===== Booking modal: scroll area + always-visible footer (NO overlay) ===== */
+/* ===== Booking modal: scroll area + always-visible footer ===== */
 
 .modal--booking .booking-form {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 1 1 auto;
   min-height: 0;
   overflow: hidden; /* чтобы скролл был только в .booking-form-scroll */
 }
@@ -1154,16 +1161,47 @@ p {
   padding: 1.5rem;
 }
 
+#bookingModal .booking-form-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Overlay для кнопки "Далее" поверх календаря */
+.modal--booking .booking-next-overlay {
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+  flex-shrink: 0;
+  padding: 0.75rem 1.5rem 1rem;
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(8px);
+  border-top: 1px solid var(--color-border-light);
+  box-shadow: 0 -10px 20px rgba(0, 0, 0, 0.08);
+}
+
+.modal--booking .booking-next-overlay .booking-step-next {
+  width: 100%;
+}
+
+.modal--booking.modal--step2 .booking-next-overlay {
+  display: none;
+}
+
 /* Footer теперь в потоке, всегда виден снизу и НЕ перекрывает поля */
 .modal--booking .booking-form-footer {
   flex: 0 0 auto;
+  flex-shrink: 0;
+  position: sticky;
+  bottom: 0;
+  z-index: 30;
   padding: 1rem 1.5rem 1.25rem;
 
   background: rgba(255, 255, 255, 0.96);
   backdrop-filter: blur(8px);
   border-top: 1px solid var(--color-border-light);
   box-shadow: 0 -12px 24px rgba(0, 0, 0, 0.06);
-  z-index: 5;
 }
 
 .modal-overlay.active .modal {
@@ -1386,17 +1424,24 @@ p {
   width: 100%;
 }
 
-/* На мобилке кнопка «Далее» всегда видна внизу */
-@media (max-width: 767px) {
-  .modal--booking .booking-step--time .booking-step-footer {
-    position: sticky;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    margin-top: 1rem;
-    padding: 0.75rem 0 0;
-    background: linear-gradient(to top, var(--color-surface) 85%, rgba(255, 255, 255, 0));
-    z-index: 10;
+@media (max-height: 820px) {
+  /* Low-height breakpoint: keep controls reachable */
+  .modal--booking .form-group {
+    margin-bottom: 0.9rem;
+  }
+
+  .modal--booking .booking-form-scroll {
+    padding-top: 1rem;
+  }
+
+  .modal--booking .booking-next-overlay {
+    padding: 0.5rem 1.25rem 0.75rem;
+    box-shadow: 0 -8px 16px rgba(0, 0, 0, 0.07);
+  }
+
+  .modal--booking .booking-form-footer {
+    padding: 0.75rem 1.25rem 1rem;
+    box-shadow: 0 -8px 16px rgba(0, 0, 0, 0.07);
   }
 }
 .booking-step-back {
@@ -1452,12 +1497,11 @@ p {
   );
 }
 
-/* Календарь внутри модалки: убираем внешний скролл,
-   скролл должен быть у FullCalendar внутри */
+/* Календарь внутри модалки: высота по контенту, скролл — у модалки */
 .booking-calendar-container {
-  height: 520px;
-  min-height: 400px;
-  max-height: min(650px, 60vh);
+  height: auto;
+  min-height: 320px;
+  max-height: none;
 
   overflow: hidden; /* ВАЖНО: вместо auto */
   border: 1px solid var(--color-border);
@@ -1465,26 +1509,6 @@ p {
   background: var(--color-surface);
 
   overscroll-behavior: contain;
-}
-
-/* Только на PC: календарь по длине больше */
-@media (min-width: 768px) {
-  .booking-calendar-container {
-    height: 72vh;
-    min-height: 540px;
-    max-height: 75vh;
-  }
-}
-
-/* FullCalendar растягиваем на высоту контейнера */
-.booking-calendar-container .fc {
-  height: 100%;
-}
-
-.booking-calendar-container .fc-view-harness,
-.booking-calendar-container .fc-scroller-harness,
-.booking-calendar-container .fc-scroller {
-  height: 100% !important;
 }
 
 /* Нормальный "ползунок" на тач-устройствах */
@@ -1559,6 +1583,11 @@ p {
 
 /* На мобильном на шаге 1: календарь адаптивно растягивается по высоте окна (flex, без хардкода) */
 @media (max-width: 767px) {
+  /* Скролл в модалке на мобильном: touch-инерция для области формы (шаг 1 и шаг 2) */
+  .modal.modal--booking .booking-form-scroll {
+    -webkit-overflow-scrolling: touch;
+  }
+
   /* Ещё компактнее блок над календарём — максимум места календарю */
   .modal.modal--booking .booking-step-label {
     font-size: 0.6875rem;
@@ -1596,33 +1625,6 @@ p {
     margin-bottom: 0.35rem;
   }
 
-  .modal.modal--booking:not(.modal--step2) .modal__dialog {
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-  }
-  .modal.modal--booking:not(.modal--step2) .modal__content {
-    flex: 1 1 auto;
-    min-height: 0;
-    display: flex !important;
-    flex-direction: column !important;
-    overflow: hidden !important;
-  }
-  .modal.modal--booking:not(.modal--step2) .booking-form {
-    flex: 1 1 auto !important;
-    min-height: 0 !important;
-    display: flex !important;
-    flex-direction: column !important;
-    overflow: hidden !important;
-  }
-  .modal.modal--booking:not(.modal--step2) .booking-form-scroll {
-    flex: 1 1 auto !important;
-    min-height: 0 !important;
-    overflow-y: auto !important;
-    display: flex !important;
-    flex-direction: column !important;
-    height: auto !important;
-  }
   .modal.modal--booking:not(.modal--step2) .booking-step--time {
     display: flex;
     flex-direction: column;
@@ -1631,21 +1633,59 @@ p {
   }
   .modal.modal--booking:not(.modal--step2) .form-group--calendar {
     flex: 1 1 auto;
-    min-height: 220px;
+    min-height: 180px;
     display: flex;
     flex-direction: column;
   }
   .modal.modal--booking:not(.modal--step2) .booking-calendar-container {
     flex: 1 1 auto;
-    min-height: 280px;
+    min-height: 240px;
+    max-height: 50vh;
     height: auto !important;
-    max-height: none !important;
+    overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     margin-left: -0.5rem;
     margin-right: -0.5rem;
     padding-left: 0.5rem;
     padding-right: 0.5rem;
   }
+
+  /* Шаг 2 на мобильном: скроллится вся модалка (контент не сжимается) */
+  #bookingModal.active .modal.modal--booking.modal--step2 {
+    max-height: calc(100dvh - 2rem);
+    height: auto;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    display: flex;
+    flex-direction: column;
+  }
+  .modal.modal--booking.modal--step2 .modal__dialog {
+    flex: 0 0 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .modal.modal--booking.modal--step2 .modal-body.modal__content {
+    flex: 0 0 auto;
+    min-height: 0;
+    overflow: visible;
+    display: flex;
+    flex-direction: column;
+  }
+  .modal.modal--booking.modal--step2 .booking-form {
+    flex: 0 0 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: visible;
+  }
+  .modal.modal--booking.modal--step2 .booking-form-scroll {
+    flex: 0 0 auto;
+    overflow: visible;
+    overflow-x: hidden;
+  }
+
   .booking-calendar-container .fc {
     min-width: 560px;
   }
@@ -2050,130 +2090,13 @@ p {
   }
 }
 
-/* ===== FORCE booking modal layout (scroll inside, footer always visible) ===== */
-
-/* 1) Окно модалки ограничиваем по высоте */
-.modal.modal--booking .modal__dialog {
-  max-height: 90vh;
-  height: 90vh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.modal.modal--booking .modal__content {
-  height: 100%;
-  max-height: 100%;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden; /* внешний скролл не нужен */
-}
-
-/* 2) Форма занимает всю высоту окна */
-.modal.modal--booking .booking-form {
-  height: 100%;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-/* 3) Скролл только тут */
-.modal.modal--booking .booking-form-scroll {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 1.5rem;
-}
-
-/* 4) Footer всегда виден и НЕ пропадает */
-.modal.modal--booking .booking-form-footer {
-  flex: 0 0 auto;
-  position: sticky; /* держим у низа окна */
-  bottom: 0;
-  z-index: 50;
-
-  padding: 1rem 1.5rem 1.25rem;
-  background: rgba(255, 255, 255, 0.96);
-  backdrop-filter: blur(8px);
-  border-top: 1px solid rgba(0,0,0,0.08);
-  box-shadow: 0 -12px 24px rgba(0, 0, 0, 0.06);
-}
-
-/* ===== FIX: make booking modal itself scrollable + sticky footer ===== */
-
-/* 1) Ограничиваем окно модалки по высоте */
-.modal.modal--booking .modal__dialog {
-  max-height: 90vh;
-}
-
-/* 2) Делаем скролл на белой карточке (контейнер модалки) */
-.modal.modal--booking .modal__content {
-  max-height: 90vh;
-  overflow-y: auto;       /* ВОТ ОН — скролл */
-  overflow-x: hidden;
-  -webkit-overflow-scrolling: touch;
-
-  /* чтобы sticky footer корректно работал */
-  display: block;
-}
-
-/* 3) Убираем ограничения, которые могут убивать скролл ниже */
-.modal.modal--booking .booking-form {
-  height: auto !important;
-  min-height: 0 !important;
-  overflow: visible !important;
-}
-
-/* 4) Внутренний scroll-слой больше не нужен — пусть растёт по контенту */
-.modal.modal--booking .booking-form-scroll {
-  overflow: visible !important;
-  height: auto !important;
-  min-height: 0 !important;
-}
-
-/* 5) Footer всегда виден, "прилипает" к низу, но не исчезает */
-.modal.modal--booking .booking-form-footer {
-  position: sticky;
-  bottom: 0;
-  z-index: 50;
-
-  padding: 1rem 1.5rem 1.25rem;
-  background: rgba(255, 255, 255, 0.96);
-  backdrop-filter: blur(8px);
-  border-top: 1px solid rgba(0,0,0,0.08);
-  box-shadow: 0 -12px 24px rgba(0, 0, 0, 0.06);
-}
+/* ===== Booking modal note: keep scroll only in .booking-form-scroll ===== */
 
 /* На шаге 2: модалка по размеру контента (не на весь экран, адекватное окно) */
 .modal.modal--booking.modal--step2 {
   max-width: 520px;
   height: auto;
-  max-height: 90vh;
-}
-.modal.modal--booking.modal--step2 .modal__dialog {
-  height: auto;
-  max-height: 90vh;
-  display: flex;
-  flex-direction: column;
-}
-.modal.modal--booking.modal--step2 .modal__content {
-  height: auto !important;
-  min-height: 0 !important;
-  max-height: none !important;
-  overflow-y: auto;
-  overflow-x: hidden;
-  flex: 0 1 auto !important;
-}
-.modal.modal--booking.modal--step2 .booking-form {
-  flex: none !important;
-  height: auto !important;
-}
-.modal.modal--booking.modal--step2 .booking-form-scroll {
-  flex: none !important;
-  height: auto !important;
-  overflow-y: visible !important;
+  max-height: calc(100dvh - 40px);
 }
 .modal.modal--booking.modal--step2 .booking-step--data {
   display: block !important;
@@ -2185,7 +2108,6 @@ p {
     display: flex !important;
     flex-direction: column !important;
     overflow: hidden !important;
-    max-height: 90vh;
   }
   .modal.modal--booking .booking-form {
     flex: 1 1 auto !important;
@@ -2220,5 +2142,6 @@ p {
     min-height: 320px;
     height: auto !important;
     max-height: none !important;
+    overflow-y: auto;
   }
 }
