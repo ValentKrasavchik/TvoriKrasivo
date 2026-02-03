@@ -17,7 +17,7 @@ const storage = multer.diskStorage({
     cb(null, `w-${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
   },
 });
-const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } }); // 5MB
+const upload = multer({ storage, limits: { fileSize: 20 * 1024 * 1024 } }); // 20MB
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
 const ADMIN_LOGIN = process.env.ADMIN_LOGIN || 'admin';
