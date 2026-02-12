@@ -63,6 +63,17 @@ adminRouter.get('/workshops', async (_req: Request, res: Response) => {
   }
 });
 
+adminRouter.get('/workshops/:id', async (req: Request, res: Response) => {
+  try {
+    const w = await prisma.workshop.findUnique({ where: { id: req.params.id } });
+    if (!w) return res.status(404).json({ error: 'Workshop not found' });
+    res.json(w);
+  } catch (e) {
+    console.error('GET /api/admin/workshops/:id', e);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 adminRouter.post('/workshops', async (req: Request, res: Response) => {
   try {
     const { title, description, durationMinutes, capacityPerSlot, result, price, isActive, imageUrl } = req.body || {};
@@ -130,7 +141,8 @@ adminRouter.patch('/workshops/:id', async (req: Request, res: Response) => {
 
     const w = await prisma.workshop.update({ where: { id: req.params.id }, data });
     res.json(w);
-  } catch (e) {
+  } catch (e: any) {
+    if (e?.code === 'P2025') return res.status(404).json({ error: 'Workshop not found' });
     console.error('PATCH /api/admin/workshops/:id', e);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -159,14 +171,9 @@ adminRouter.delete('/workshops/:id', async (req: Request, res: Response) => {
 
     res.status(204).send();
   } catch (e: any) {
-    console.error('DELETE /api/admin/workshops/:id', e);
-    const code = e?.code;
-    if (code === 'P2025') {
-      return res.status(404).json({ error: 'Workshop not found' });
-    }
-    // В ответе возвращаем сообщение ошибки для отладки (в проде можно убрать или скрыть за флагом)
-    const message = e?.message || 'Internal server error';
-    res.status(500).json({ error: 'Internal server error', details: message });
+    if (e?.code === 'P2025') return res.status(404).json({ error: 'Workshop not found' });
+    console.error('DELETE /api/admin/workshops/:id', e?.message ?? e);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
