@@ -735,7 +735,7 @@ async function openBookingModal(workshopId) {
   const { dateFrom, dateTo } = getDateRange(7, 60);
   const slotsUrl = `${API_BASE}/api/public/slots?workshopId=${encodeURIComponent(workshopId)}&dateFrom=${dateFrom}&dateTo=${dateTo}`;
   try {
-    const res = await fetch(slotsUrl);
+    const res = await fetch(slotsUrl, { cache: 'no-store' });
     const contentType = (res.headers.get('content-type') || '').split(';')[0].trim();
     if (!contentType.includes('application/json')) {
       var t = await res.text().catch(function () { return ''; });
@@ -769,13 +769,20 @@ async function openBookingModal(workshopId) {
     return d;
   }
 
+  var slotMin = '09:00:00';
+  var slotMax = '21:00:00';
   var events = publicSlotsCache.map(function (s) {
     var start = new Date(s.startAt || s.date + 'T' + s.time + ':00');
     var end = addMinutesLocal(start, s.durationMinutes != null ? s.durationMinutes : durationMinutes);
     var free = Number(s.freeSeats);
     if (isNaN(free)) free = 0;
     var cap = s.capacityTotal != null ? s.capacityTotal : (s.capacity || 6);
-    var isBusy = free <= 0 || String(s.status || '').toUpperCase() !== 'OPEN';
+    var statusUpper = String(s.status || '').toUpperCase();
+    var isBusy = free <= 0 || statusUpper !== 'OPEN';
+    if (statusUpper === 'HELD' || statusUpper === 'CANCELLED') {
+      start = new Date(s.date + 'T' + slotMin.slice(0, 5) + ':00');
+      end = new Date(s.date + 'T' + slotMax.slice(0, 5) + ':00');
+    }
     return {
       id: s.id,
       title: isBusy ? 'Нет мест' : 'Свободно: ' + free + '/' + cap,
@@ -1180,7 +1187,7 @@ async function submitBookingForm(e) {
       closeBookingModal();
       var msgEl = document.getElementById('successModalText');
       if (res.status === 202 && data.message && msgEl) msgEl.textContent = data.message;
-      else if (msgEl) msgEl.textContent = 'Мы свяжемся с вами в течение 2-3 часов для подтверждения записи.';
+      else if (msgEl) msgEl.textContent = 'Мы свяжемся с вами в ближайшее время для подтверждения записи.';
       openSuccessModal();
       return;
     }
@@ -1316,7 +1323,7 @@ function initYandexMap() {
   ymaps.ready(function () {
     try {
       // API 2.1: center [широта, долгота]
-      const center = [48.009, 37.803]; // Донецк, ул. Розы Люксембург 75А
+      const center = [48.020265, 37.790633]; // Донецк, ул. Розы Люксембург 75А
 
       const map = new ymaps.Map('yandexMap', {
         center: center,
