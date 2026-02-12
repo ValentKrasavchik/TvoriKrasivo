@@ -47,6 +47,10 @@ npm run dev
 
 И добавьте `http://localhost:3000` (или порт вашего сайта) в `CORS_ORIGIN` в `backend/.env`.
 
+## Деплой на сервер
+
+Инструкция по развёртыванию на VPS (сборка, systemd, nginx) — в [DEPLOY.md](DEPLOY.md).
+
 ## Рекомендации из ТЗ
 
 - **Антиспам:** rate limit на `POST /bookings`, honeypot в форме (уже есть)

@@ -103,14 +103,42 @@ adminRouter.patch('/workshops/:id', async (req: Request, res: Response) => {
   try {
     const body = req.body || {};
     const data: any = {};
+
     if (body.title !== undefined) data.title = String(body.title);
     if (body.description !== undefined) data.description = String(body.description);
-    if (body.durationMinutes !== undefined) data.durationMinutes = Math.max(1, parseInt(String(body.durationMinutes), 10));
-    if (body.capacityPerSlot !== undefined) data.capacityPerSlot = Math.max(1, parseInt(String(body.capacityPerSlot), 10));
+
+    // durationMinutes: игнорируем пустую строку, валидируем число
+    if (body.durationMinutes !== undefined && body.durationMinutes !== '') {
+      const parsed = parseInt(String(body.durationMinutes), 10);
+      if (Number.isNaN(parsed)) {
+        return res.status(400).json({ error: 'Invalid durationMinutes' });
+      }
+      data.durationMinutes = Math.max(1, parsed);
+    }
+
+    // capacityPerSlot: игнорируем пустую строку, валидируем число
+    if (body.capacityPerSlot !== undefined && body.capacityPerSlot !== '') {
+      const parsed = parseInt(String(body.capacityPerSlot), 10);
+      if (Number.isNaN(parsed)) {
+        return res.status(400).json({ error: 'Invalid capacityPerSlot' });
+      }
+      data.capacityPerSlot = Math.max(1, parsed);
+    }
+
     if (body.result !== undefined) data.result = String(body.result);
-    if (body.price !== undefined) data.price = Math.max(0, parseInt(String(body.price), 10) || 0);
+
+    // price: игнорируем пустую строку, валидируем число
+    if (body.price !== undefined && body.price !== '') {
+      const parsed = parseInt(String(body.price), 10);
+      if (Number.isNaN(parsed)) {
+        return res.status(400).json({ error: 'Invalid price' });
+      }
+      data.price = Math.max(0, parsed);
+    }
+
     if (body.imageUrl !== undefined) data.imageUrl = body.imageUrl === '' ? null : String(body.imageUrl);
     if (body.isActive !== undefined) data.isActive = Boolean(body.isActive);
+
     const w = await prisma.workshop.update({ where: { id: req.params.id }, data });
     res.json(w);
   } catch (e: any) {
@@ -123,16 +151,24 @@ adminRouter.patch('/workshops/:id', async (req: Request, res: Response) => {
 adminRouter.delete('/workshops/:id', async (req: Request, res: Response) => {
   try {
     const workshopId = req.params.id;
+
     await prisma.$transaction(async (tx) => {
-      const slots = await tx.slot.findMany({ where: { workshopId }, select: { id: true } });
-      for (const slot of slots) {
-        // Порядок важен для FK: сначала холды (ссылаются на slot и booking), потом брони, потом слот
-        await tx.seatHold.deleteMany({ where: { slotId: slot.id } });
-        await tx.booking.deleteMany({ where: { slotId: slot.id } });
-        await tx.slot.delete({ where: { id: slot.id } });
+      const slots = await tx.slot.findMany({
+        where: { workshopId },
+        select: { id: true },
+      });
+      const slotIds = slots.map((s) => s.id);
+
+      if (slotIds.length > 0) {
+        // Порядок важен: сначала холды (ссылаются на slot и booking), потом брони, потом слоты
+        await tx.seatHold.deleteMany({ where: { slotId: { in: slotIds } } });
+        await tx.booking.deleteMany({ where: { slotId: { in: slotIds } } });
+        await tx.slot.deleteMany({ where: { id: { in: slotIds } } });
       }
+
       await tx.workshop.delete({ where: { id: workshopId } });
     });
+
     res.status(204).send();
   } catch (e: any) {
     if (e?.code === 'P2025') return res.status(404).json({ error: 'Workshop not found' });

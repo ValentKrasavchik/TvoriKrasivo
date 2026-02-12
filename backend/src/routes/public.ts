@@ -105,6 +105,9 @@ publicRouter.get('/slots', async (req: Request, res: Response) => {
 
     const withAvailability = await getSlotsWithAvailability(prisma, slots);
 
+    // Чтобы замороженные (HELD) слоты сразу отображались на клиенте — не кэшировать ответ
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+
     res.json(
       withAvailability.map((s) => {
         const startAt = `${s.date}T${s.time}:00`;

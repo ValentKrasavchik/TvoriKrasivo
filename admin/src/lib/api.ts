@@ -111,7 +111,10 @@ export async function deleteWorkshop(id: string) {
 
 export async function fetchSlots(params?: { workshopId?: string; dateFrom?: string; dateTo?: string }) {
   const q = new URLSearchParams(params as Record<string, string>).toString();
-  const res = await fetch(`${API}/admin/slots${q ? `?${q}` : ''}`, { headers: authHeaders() });
+  const res = await fetch(`${API}/admin/slots${q ? `?${q}` : ''}`, {
+    headers: authHeaders(),
+    cache: 'no-store',
+  });
   if (!res.ok) throw new Error('Failed to load slots');
   return res.json();
 }
@@ -122,8 +125,12 @@ export async function createSlot(data: { workshopId: string; date: string; time:
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify(data),
   });
-  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Failed');
-  return res.json();
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = (body && typeof body.error === 'string') ? body.error : (body && typeof body.message === 'string') ? body.message : `Ошибка ${res.status}`;
+    throw new Error(msg);
+  }
+  return body;
 }
 
 export async function updateSlot(id: string, data: { status?: string; capacity?: number; durationMinutes?: number }) {

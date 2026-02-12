@@ -36,24 +36,26 @@ function getInitialWeek() {
 
 type WorkshopOption = { id: string; label: string; durationMinutes: number };
 
+function slotToEvent(s: Slot) {
+  const free = s.freeSeats ?? s.capacity ?? 0;
+  const cap = s.capacityTotal ?? s.capacity ?? 0;
+  const start = new Date(`${s.date}T${s.time}:00`);
+  const end = new Date(start);
+  const duration = s.durationMinutes ?? s.workshop?.durationMinutes ?? 120;
+  end.setMinutes(end.getMinutes() + duration);
+  return {
+    id: s.id,
+    title: `${s.time} — ${s.status} — Своб: ${free}/${cap}`,
+    start,
+    end,
+    extendedProps: { slot: s },
+    backgroundColor:
+      s.status === 'HELD' ? '#94a3b8' : s.status === 'CANCELLED' ? '#f87171' : (s.freeSeats ?? 0) === 0 ? '#fcd34d' : '#34d399',
+  };
+}
+
 function slotsToEvents(slots: Slot[]) {
-  return slots.map((s) => {
-    const free = s.freeSeats ?? 0;
-    const cap = s.capacityTotal ?? s.capacity ?? 0;
-    const start = new Date(`${s.date}T${s.time}:00`);
-    const end = new Date(start);
-    const duration = s.durationMinutes ?? s.workshop?.durationMinutes ?? 120;
-    end.setMinutes(end.getMinutes() + duration);
-    return {
-      id: s.id,
-      title: `${s.time} — ${s.status} — Своб: ${free}/${cap}`,
-      start,
-      end,
-      extendedProps: { slot: s },
-      backgroundColor:
-        s.status === 'HELD' ? '#94a3b8' : s.status === 'CANCELLED' ? '#f87171' : (s.freeSeats ?? 0) === 0 ? '#fcd34d' : '#34d399',
-    };
-  });
+  return slots.map(slotToEvent);
 }
 
 export default function Calendar() {
@@ -62,7 +64,13 @@ export default function Calendar() {
   const [workshopId, setWorkshopId] = useState('');
   const [dateFrom, setDateFrom] = useState(initialWeek.dateFrom);
   const [dateTo, setDateTo] = useState(initialWeek.dateTo);
-  const [modal, setModal] = useState<{ type: 'create' | 'edit'; slot?: Slot; date?: string; time?: string } | null>(null);
+  const [modal, setModal] = useState<{
+    type: 'create' | 'edit';
+    slot?: Slot;
+    date?: string;
+    time?: string;
+    createDateRange?: { dateFrom: string; dateTo: string };
+  } | null>(null);
   const [form, setForm] = useState({ workshopId: '', date: '', time: '12:00', capacity: 6, freeze: false, durationMinutes: 120 });
   const [slotsOverviewOpen, setSlotsOverviewOpen] = useState(false);
   const [overviewCountByDay, setOverviewCountByDay] = useState<Record<string, number>>({});
@@ -90,6 +98,7 @@ export default function Calendar() {
     if (workshops.length && !workshopId) setWorkshopId(workshops[0].id);
   }, [workshops, workshopId]);
   const [error, setError] = useState('');
+  const [creating, setCreating] = useState(false);
 
   const getWorkshopDuration = (id: string) => {
     const w = workshops.find((item) => item.id === id);
@@ -107,21 +116,46 @@ export default function Calendar() {
     return () => clearInterval(intervalId);
   }, [workshopId]);
 
-  function openCreateFromDate(arg: { dateStr: string }) {
-    const d = arg.dateStr.slice(0, 10);
+  function openCreateFromDate(arg: { dateStr: string; date?: Date }) {
+    const dateStr = arg.dateStr.slice(0, 10);
+    let time = '12:00';
+    if (arg.dateStr.includes('T') && arg.date) {
+      time = `${String(arg.date.getHours()).padStart(2, '0')}:${String(arg.date.getMinutes()).padStart(2, '0')}`;
+    }
     const duration = getWorkshopDuration(workshopId);
-    setForm({ workshopId, date: d, time: '12:00', capacity: 6, freeze: false, durationMinutes: duration });
-    setModal({ type: 'create', date: d });
+    setForm({ workshopId, date: dateStr, time, capacity: 6, freeze: false, durationMinutes: duration });
+    setModal({ type: 'create', date: dateStr });
     setError('');
   }
 
-  function openCreateFromSelect(selectInfo: { start: Date; end: Date; view: { calendar: { unselect: () => void } } }) {
+  function openCreateFromSelect(selectInfo: { start: Date; end: Date; allDay?: boolean; startStr?: string; endStr?: string; view: { type?: string; calendar: { unselect: () => void } } }) {
     const start = selectInfo.start;
-    const d = start.toISOString().slice(0, 10);
-    const time = `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`;
+    const viewType = selectInfo.view?.type;
+    const isDayView = viewType === 'timeGridDay';
+    const isAllDay = !isDayView && Boolean(selectInfo.allDay);
+    const dateStr =
+      (selectInfo.startStr && selectInfo.startStr.slice(0, 10).match(/^\d{4}-\d{2}-\d{2}$/))
+        ? selectInfo.startStr.slice(0, 10)
+        : `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`;
+    const time = isAllDay
+      ? '00:00'
+      : `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`;
     const diffMinutes = Math.max(1, Math.round((selectInfo.end.getTime() - selectInfo.start.getTime()) / 60000));
-    setForm({ workshopId, date: d, time, capacity: 6, freeze: true, durationMinutes: diffMinutes });
-    setModal({ type: 'create', date: d });
+    setForm({ workshopId, date: dateStr, time, capacity: 6, freeze: true, durationMinutes: diffMinutes });
+
+    let createDateRange: { dateFrom: string; dateTo: string } | undefined;
+    if (isAllDay && selectInfo.startStr && selectInfo.endStr) {
+      const dateFrom = selectInfo.startStr.slice(0, 10);
+      const endExclusive = selectInfo.endStr.slice(0, 10);
+      const endDate = new Date(endExclusive + 'T12:00:00');
+      endDate.setDate(endDate.getDate() - 1);
+      const dateTo = endDate.toISOString().slice(0, 10);
+      if (dateTo >= dateFrom && dateFrom !== dateTo) {
+        createDateRange = { dateFrom, dateTo };
+      }
+    }
+
+    setModal({ type: 'create', date: dateStr, createDateRange });
     setError('');
     selectInfo.view?.calendar?.unselect?.();
   }
@@ -139,14 +173,57 @@ export default function Calendar() {
     setError('');
   }
 
+  function getDatesInRange(dateFrom: string, dateTo: string): string[] {
+    const out: string[] = [];
+    const from = new Date(dateFrom + 'T12:00:00');
+    const to = new Date(dateTo + 'T12:00:00');
+    for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
+      out.push(d.toISOString().slice(0, 10));
+    }
+    return out;
+  }
+
   async function handleCreate() {
     setError('');
+    const wid = form.workshopId || workshopId;
+    if (!wid || !form.date || !form.time) {
+      setError('Укажите мастер-класс, дату и время');
+      return;
+    }
+    setCreating(true);
     try {
-      await createSlot(form);
+      const payload = { ...form, workshopId: wid };
+      const range = modal?.createDateRange;
+      const api = calendarRef.current?.getApi();
+      if (range) {
+        const dates = getDatesInRange(range.dateFrom, range.dateTo);
+        if (dates.length > 0) {
+          const duration = getWorkshopDuration(wid);
+          for (const date of dates) {
+            const created = await createSlot({
+              workshopId: wid,
+              date,
+              time: '00:00',
+              capacity: payload.capacity,
+              freeze: true,
+              durationMinutes: duration,
+            });
+            if (api && created) api.addEvent(slotToEvent(created as Slot));
+          }
+        } else {
+          const created = await createSlot(payload);
+          if (api && created) api.addEvent(slotToEvent(created as Slot));
+        }
+      } else {
+        const created = await createSlot(payload);
+        if (api && created) api.addEvent(slotToEvent(created as Slot));
+      }
       setModal(null);
       refetchEvents();
     } catch (e: any) {
-      setError(e.message || 'Ошибка');
+      setError(e?.message || String(e) || 'Ошибка создания');
+    } finally {
+      setCreating(false);
     }
   }
 
@@ -300,18 +377,38 @@ export default function Calendar() {
       </div>
 
       {modal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 sm:p-6" onClick={() => setModal(null)}>
-          <div className="w-full max-w-sm max-h-[90vh] overflow-y-auto rounded-xl bg-white p-4 shadow-xl sm:p-6" onClick={(e) => e.stopPropagation()}>
-            <h2 className="mb-4 font-semibold">{modal.type === 'create' ? 'Новый слот' : 'Редактировать слот'}</h2>
-            <div className="space-y-3">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 sm:p-6"
+          onClick={(e) => { if (e.target === e.currentTarget) setModal(null); }}
+        >
+          <div className="w-full max-w-sm max-h-[90vh] overflow-y-auto rounded-xl bg-white p-4 shadow-xl sm:p-6">
+            <h2 className="mb-4 font-semibold">
+              {modal.type === 'create' && modal.createDateRange
+                ? `Заморозить период (HELD)`
+                : modal.type === 'create'
+                  ? 'Новый слот'
+                  : 'Редактировать слот'}
+            </h2>
+            <form
+              className="space-y-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (creating) return;
+                if (modal?.type === 'create') handleCreate();
+                else if (modal?.type === 'edit') handleUpdate();
+              }}
+              noValidate
+            >
               <div>
                 <label className="block text-sm text-slate-600">Мастер-класс</label>
                 <select
-                  value={form.workshopId}
+                  value={form.workshopId || workshopId}
                   onChange={(e) => setForm((f) => ({ ...f, workshopId: e.target.value }))}
                   className="mt-1 w-full rounded border px-3 py-2"
                   disabled={modal.type === 'edit'}
                 >
+                  <option value="">Выберите мастер-класс</option>
                   {workshops.map((w) => (
                     <option key={w.id} value={w.id}>
                       {w.label}
@@ -319,55 +416,66 @@ export default function Calendar() {
                   ))}
                 </select>
               </div>
-              <div>
-                <label className="block text-sm text-slate-600">Дата</label>
-                <input
-                  type="date"
-                  value={form.date}
-                  onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
-                  className="mt-1 w-full rounded border px-3 py-2"
-                  disabled={modal.type === 'edit'}
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-slate-600">Время</label>
-                <input
-                  type="time"
-                  value={form.time}
-                  onChange={(e) => setForm((f) => ({ ...f, time: e.target.value }))}
-                  className="mt-1 w-full rounded border px-3 py-2"
-                  disabled={modal.type === 'edit'}
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-slate-600">Вместимость</label>
-                <input
-                  type="number"
-                  min={1}
-                  value={form.capacity}
-                  onChange={(e) => setForm((f) => ({ ...f, capacity: parseInt(e.target.value, 10) || 1 }))}
-                  className="mt-1 w-full rounded border px-3 py-2"
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-slate-600">Длительность (мин)</label>
-                <input
-                  type="number"
-                  min={1}
-                  value={form.durationMinutes}
-                  onChange={(e) => setForm((f) => ({ ...f, durationMinutes: parseInt(e.target.value, 10) || 1 }))}
-                  className="mt-1 w-full rounded border px-3 py-2"
-                />
-              </div>
-              <label className="mt-3 flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={form.freeze}
-                  onChange={(e) => setForm((f) => ({ ...f, freeze: e.target.checked }))}
-                  className="h-4 w-4"
-                />
-                Заморозить это время (HELD)
-              </label>
+              {modal.createDateRange ? (
+                <div className="rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                  С {modal.createDateRange.dateFrom} по {modal.createDateRange.dateTo} — будет создано{' '}
+                  {getDatesInRange(modal.createDateRange.dateFrom, modal.createDateRange.dateTo).length} слотов (HELD, 00:00).
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-sm text-slate-600">Дата</label>
+                  <input
+                    type="date"
+                    value={form.date}
+                    onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
+                    className="mt-1 w-full rounded border px-3 py-2"
+                    disabled={modal.type === 'edit'}
+                  />
+                </div>
+              )}
+              {!modal.createDateRange && (
+                <>
+                  <div>
+                    <label className="block text-sm text-slate-600">Время</label>
+                    <input
+                      type="time"
+                      value={form.time}
+                      onChange={(e) => setForm((f) => ({ ...f, time: e.target.value }))}
+                      className="mt-1 w-full rounded border px-3 py-2"
+                      disabled={modal.type === 'edit'}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-slate-600">Вместимость</label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={form.capacity}
+                      onChange={(e) => setForm((f) => ({ ...f, capacity: parseInt(e.target.value, 10) || 1 }))}
+                      className="mt-1 w-full rounded border px-3 py-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-slate-600">Длительность (мин)</label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={form.durationMinutes}
+                      onChange={(e) => setForm((f) => ({ ...f, durationMinutes: parseInt(e.target.value, 10) || 1 }))}
+                      className="mt-1 w-full rounded border px-3 py-2"
+                    />
+                  </div>
+                  <label className="mt-3 flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={form.freeze}
+                      onChange={(e) => setForm((f) => ({ ...f, freeze: e.target.checked }))}
+                      className="h-4 w-4"
+                    />
+                    Заморозить это время (HELD)
+                  </label>
+                </>
+              )}
               {modal.type === 'edit' && modal.slot && (
                 <div className="flex gap-2">
                   <button
@@ -379,20 +487,26 @@ export default function Calendar() {
                   </button>
                 </div>
               )}
-            </div>
-            {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
-            <div className="mt-4 flex gap-2">
-              <button
-                type="button"
-                onClick={modal.type === 'create' ? handleCreate : handleUpdate}
-                className="rounded-lg bg-amber-600 px-4 py-2 text-white hover:bg-amber-700"
-              >
-                {modal.type === 'create' ? 'Создать' : 'Сохранить'}
-              </button>
-              <button type="button" onClick={() => setModal(null)} className="rounded-lg border px-4 py-2">
-                Отмена
-              </button>
-            </div>
+              {error && <p className="mt-2 rounded bg-red-50 px-2 py-1.5 text-sm text-red-700" role="alert">{error}</p>}
+              <div className="mt-4 flex gap-2">
+                <button
+                  type="submit"
+                  disabled={creating}
+                  className="rounded-lg bg-amber-600 px-4 py-2 text-white hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {creating
+                    ? 'Создание…'
+                    : modal.type === 'create' && modal.createDateRange
+                      ? `Заморозить ${getDatesInRange(modal.createDateRange.dateFrom, modal.createDateRange.dateTo).length} дней`
+                      : modal.type === 'create'
+                        ? 'Создать'
+                        : 'Сохранить'}
+                </button>
+                <button type="button" onClick={() => setModal(null)} className="rounded-lg border px-4 py-2">
+                  Отмена
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
