@@ -66,11 +66,36 @@ publicRouter.get('/gallery', async (_req: Request, res: Response) => {
         id: g.id,
         imageUrl: g.imageUrl,
         alt: g.alt ?? null,
+        comment: g.comment ?? null,
         sortOrder: g.sortOrder,
       }))
     );
   } catch (e) {
     console.error('GET /api/public/gallery', e);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/public/contacts — блоки контактов для сайта
+publicRouter.get('/contacts', async (_req: Request, res: Response) => {
+  try {
+    const list = await prisma.contactBlock.findMany({ orderBy: { sortOrder: 'asc' } });
+    res.set('Cache-Control', 'no-store, must-revalidate');
+    res.json({
+      blocks: list.map((b) => ({
+        id: b.id,
+        sortOrder: b.sortOrder,
+        blockType: b.blockType,
+        label: b.label,
+        value: b.value ?? null,
+        href: b.href ?? null,
+        variant: b.variant ?? null,
+        iconKey: b.iconKey,
+        customIconUrl: b.customIconUrl ?? null,
+      })),
+    });
+  } catch (e) {
+    console.error('GET /api/public/contacts', e);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -134,6 +159,88 @@ publicRouter.get('/slots', async (req: Request, res: Response) => {
 });
 
 const SEAT_HOLD_EXPIRES_MINUTES = 120; // 2 hours
+
+// POST /api/public/workshop-requests — заявка "Хочу мастер-класс" на свободную дату/время без существующего слота
+publicRouter.post('/workshop-requests', bookingLimiter, async (req: Request, res: Response) => {
+  try {
+    const {
+      workshopId,
+      date,
+      time,
+      name,
+      phone,
+      messenger,
+      participants = 1,
+      comment,
+      honeypot,
+    } = req.body || {};
+
+    if (honeypot) {
+      return res.status(400).json({ error: 'Invalid request' });
+    }
+
+    if (!workshopId || !date || !time || !name || !phone || !messenger) {
+      return res.status(400).json({
+        error: 'Validation error',
+        fields: {
+          ...(!workshopId && { workshopId: 'Required' }),
+          ...(!date && { date: 'Required' }),
+          ...(!time && { time: 'Required' }),
+          ...(!name?.trim() && { name: 'Required' }),
+          ...(!phone?.trim() && { phone: 'Required' }),
+          ...(!messenger && { messenger: 'Required' }),
+        },
+      });
+    }
+
+    const phoneNorm = normalizePhone(phone);
+    if (!phoneNorm) {
+      return res.status(400).json({ error: 'Validation error', fields: { phone: 'Invalid phone number' } });
+    }
+
+    const participantsNum = Math.max(1, parseInt(String(participants), 10) || 1);
+    const workshop = await prisma.workshop.findUnique({ where: { id: String(workshopId) } });
+    if (!workshop || !workshop.isActive) {
+      return res.status(404).json({ error: 'Workshop not found' });
+    }
+
+    const dt = new Date(`${date}T${time}:00`);
+    if (Number.isNaN(dt.getTime()) || dt.getTime() < Date.now()) {
+      return res.status(400).json({ error: 'Нельзя создать заявку на прошедшую дату/время' });
+    }
+
+    const existingSlot = await prisma.slot.findFirst({
+      where: { date: String(date), time: String(time) },
+      select: { id: true },
+    });
+    if (existingSlot) {
+      return res.status(409).json({ error: 'На это время уже есть мастер-класс. Выберите другое время.' });
+    }
+
+    const created = await prisma.workshopRequest.create({
+      data: {
+        workshopId: String(workshopId),
+        date: String(date),
+        time: String(time),
+        name: String(name).trim(),
+        phone: phoneNorm,
+        messenger: String(messenger).trim(),
+        participants: participantsNum,
+        comment: comment ? String(comment).trim() : null,
+        status: 'NEW',
+      },
+    });
+
+    return res.status(201).json({
+      id: created.id,
+      status: created.status,
+      message: 'Заявка отправлена администратору',
+    });
+  } catch (e) {
+    console.error('POST /api/public/workshop-requests', e);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 // POST /api/public/bookings — с логикой overflow (participants > freeSeats → PENDING_ADMIN + SeatHold)
 publicRouter.post('/bookings', bookingLimiter, async (req: Request, res: Response) => {

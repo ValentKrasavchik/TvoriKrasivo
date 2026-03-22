@@ -9,6 +9,8 @@ import { publicRouter } from './routes/public';
 import { adminRouter } from './routes/admin';
 
 const app = express();
+app.use(express.json({ limit: '2mb' }));
+
 const uploadsDir = path.join(process.cwd(), 'uploads');
 app.use('/uploads', express.static(uploadsDir));
 // Раздача по /api/uploads — тот же путь, что проксируется к бэкенду (картинки грузятся без доп. правил nginx)
@@ -23,7 +25,6 @@ app.use(
 );
 
 app.use(helmet());
-app.use(express.json());
 
 const generalLimiter = rateLimit({
   windowMs: 1 * 60 * 1000,

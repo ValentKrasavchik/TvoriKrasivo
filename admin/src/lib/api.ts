@@ -17,6 +17,37 @@ function getToken(): string | null {
   return localStorage.getItem('adminToken');
 }
 
+/** Ответ не похож на JSON слота (часто index.html из‑за nginx: PATCH не проксируется на Node) */
+const ERR_SLOT_NOT_JSON =
+  'Сервер вернул не JSON (часто это HTML страницы). Настройте nginx: PATCH к API должен идти на тот же backend, что и GET. Для префикса /gonchar/1 см. DEPLOY.md (location /gonchar/1/api/).';
+
+function parseAdminSlotResponse(res: Response, text: string): Record<string, unknown> {
+  let data: unknown;
+  try {
+    data = text.length ? JSON.parse(text) : null;
+  } catch {
+    const head = text.slice(0, 120).replace(/\s+/g, ' ').trim();
+    if (head.startsWith('<!') || head.toLowerCase().startsWith('<html')) {
+      throw new Error(ERR_SLOT_NOT_JSON);
+    }
+    throw new Error(`Ответ не JSON: ${head.slice(0, 80)}…`);
+  }
+  if (!res.ok) {
+    const o = data && typeof data === 'object' ? (data as Record<string, unknown>) : {};
+    const msg =
+      typeof o.error === 'string'
+        ? o.error
+        : typeof o.message === 'string'
+          ? o.message
+          : `Ошибка ${res.status}`;
+    throw new Error(msg);
+  }
+  if (data === null || typeof data !== 'object' || typeof (data as Record<string, unknown>).id !== 'string') {
+    throw new Error(ERR_SLOT_NOT_JSON);
+  }
+  return data as Record<string, unknown>;
+}
+
 export async function login(login: string, password: string): Promise<{ token: string; login: string }> {
   const res = await fetch(`${API}/admin/login`, {
     method: 'POST',
@@ -115,8 +146,24 @@ export async function fetchSlots(params?: { workshopId?: string; dateFrom?: stri
     headers: authHeaders(),
     cache: 'no-store',
   });
-  if (!res.ok) throw new Error('Failed to load slots');
-  return res.json();
+  const text = await res.text();
+  let data: unknown;
+  try {
+    data = text.length ? JSON.parse(text) : null;
+  } catch {
+    throw new Error('Не удалось разобрать ответ при загрузке слотов. Проверьте VITE_API_BASE и прокси /api.');
+  }
+  if (!res.ok) {
+    const o = data && typeof data === 'object' ? (data as Record<string, unknown>) : {};
+    const msg = typeof o.error === 'string' ? o.error : `Ошибка ${res.status}`;
+    throw new Error(msg);
+  }
+  if (!Array.isArray(data)) {
+    throw new Error(
+      'Список слотов: неверный формат (ожидался JSON-массив). GET /api не попадает в backend — см. DEPLOY.md.'
+    );
+  }
+  return data;
 }
 
 export async function createSlot(data: { workshopId: string; date: string; time: string; capacity?: number; freeze?: boolean; durationMinutes?: number }) {
@@ -125,26 +172,28 @@ export async function createSlot(data: { workshopId: string; date: string; time:
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify(data),
   });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const msg = (body && typeof body.error === 'string') ? body.error : (body && typeof body.message === 'string') ? body.message : `Ошибка ${res.status}`;
-    throw new Error(msg);
-  }
-  return body;
+  const text = await res.text();
+  return parseAdminSlotResponse(res, text);
 }
 
-export async function updateSlot(id: string, data: { status?: string; capacity?: number; durationMinutes?: number }) {
-  const res = await fetch(`${API}/admin/slots/${id}`, {
+export async function updateSlot(id: string, data: {
+  status?: string;
+  capacity?: number;
+  durationMinutes?: number;
+  workshopId?: string;
+}) {
+  const safeId = encodeURIComponent(id);
+  const res = await fetch(`${API}/admin/slots/${safeId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify(data),
   });
-  if (!res.ok) throw new Error('Failed');
-  return res.json();
+  const text = await res.text();
+  return parseAdminSlotResponse(res, text);
 }
 
 export async function deleteSlot(id: string) {
-  const res = await fetch(`${API}/admin/slots/${id}`, { method: 'DELETE', headers: authHeaders() });
+  const res = await fetch(`${API}/admin/slots/${encodeURIComponent(id)}`, { method: 'DELETE', headers: authHeaders() });
   if (!res.ok) throw new Error('Failed');
 }
 
@@ -194,6 +243,51 @@ export async function cancelBooking(id: string) {
 export async function deleteBooking(id: string) {
   const res = await fetch(`${API}/admin/bookings/${id}`, { method: 'DELETE', headers: authHeaders() });
   if (!res.ok) throw new Error('Failed');
+}
+
+// --- New workshop requests ---
+export async function fetchWorkshopRequests() {
+  const res = await fetch(`${API}/admin/workshop-requests`, { headers: authHeaders() });
+  if (!res.ok) throw new Error('Failed to load workshop requests');
+  return res.json();
+}
+
+export async function updateWorkshopRequest(
+  id: string,
+  data: Partial<{
+    workshopId: string;
+    date: string;
+    time: string;
+    name: string;
+    phone: string;
+    messenger: string;
+    participants: number;
+    comment: string | null;
+  }>
+) {
+  const res = await fetch(`${API}/admin/workshop-requests/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(data),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body?.error || 'Failed');
+  return body;
+}
+
+export async function deleteWorkshopRequest(id: string) {
+  const res = await fetch(`${API}/admin/workshop-requests/${id}`, { method: 'DELETE', headers: authHeaders() });
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Failed');
+}
+
+export async function confirmWorkshopRequest(id: string) {
+  const res = await fetch(`${API}/admin/workshop-requests/${id}/confirm`, {
+    method: 'POST',
+    headers: authHeaders(),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body?.error || 'Failed');
+  return body;
 }
 
 // --- Reviews ---
@@ -248,13 +342,16 @@ export async function uploadGalleryImage(file: File, alt?: string) {
   return res.json();
 }
 
-export async function updateGalleryImage(id: string, data: { alt?: string | null; sortOrder?: number }) {
+export async function updateGalleryImage(id: string, data: { alt?: string | null; comment?: string | null; sortOrder?: number }) {
   const res = await fetch(`${API}/admin/gallery/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify(data),
   });
-  if (!res.ok) throw new Error('Failed');
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || `Ошибка ${res.status}`);
+  }
   return res.json();
 }
 
@@ -263,3 +360,33 @@ export async function deleteGalleryImage(id: string) {
   if (!res.ok) throw new Error('Failed');
 }
 
+// --- Контакты (блоки на сайте) ---
+export type ContactBlockDto = {
+  id?: string;
+  sortOrder?: number;
+  blockType: 'FIELD' | 'BUTTON';
+  label: string;
+  value: string | null;
+  href: string | null;
+  variant: 'primary' | 'secondary' | null;
+  iconKey: string;
+  /** Только при iconKey === 'custom' — URL из загрузки (/api/uploads/...) */
+  customIconUrl?: string | null;
+};
+
+export async function fetchContacts(): Promise<{ blocks: ContactBlockDto[] }> {
+  const res = await fetch(`${API}/admin/contacts`, { headers: authHeaders(), cache: 'no-store' });
+  if (!res.ok) throw new Error('Не удалось загрузить контакты');
+  return res.json();
+}
+
+export async function saveContacts(blocks: Omit<ContactBlockDto, 'id' | 'sortOrder'>[]): Promise<{ blocks: ContactBlockDto[] }> {
+  const res = await fetch(`${API}/admin/contacts`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ blocks }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error((body as { error?: string }).error || 'Ошибка сохранения');
+  return body;
+}

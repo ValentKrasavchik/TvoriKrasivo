@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import { fetchGallery, uploadGalleryImage, deleteGalleryImage, fullImageUrl } from '../lib/api';
+import { fetchGallery, uploadGalleryImage, updateGalleryImage, deleteGalleryImage, fullImageUrl } from '../lib/api';
 
 type GalleryImage = {
   id: string;
   imageUrl: string;
   alt: string | null;
+  comment: string | null;
   sortOrder: number;
 };
 
@@ -13,6 +14,9 @@ export default function Gallery() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editAlt, setEditAlt] = useState('');
+  const [editComment, setEditComment] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function load() {
@@ -64,6 +68,31 @@ export default function Gallery() {
     }
   }
 
+  function startEdit(img: GalleryImage) {
+    setEditingId(img.id);
+    setEditAlt(img.alt ?? '');
+    setEditComment(img.comment ?? '');
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditAlt('');
+    setEditComment('');
+  }
+
+  async function saveEdit(id: string, currentAlt: string, currentComment: string) {
+    setError('');
+    try {
+      await updateGalleryImage(id, { alt: currentAlt || null, comment: currentComment || null });
+      setEditingId(null);
+      setEditAlt('');
+      setEditComment('');
+      await load();
+    } catch (e: any) {
+      setError(e.message || 'Ошибка сохранения');
+    }
+  }
+
   return (
     <div>
       <h1 className="mb-4 text-xl font-semibold text-slate-800 sm:text-2xl">Галерея работ</h1>
@@ -109,16 +138,67 @@ export default function Gallery() {
                   }}
                 />
               </div>
-              {img.alt && <p className="truncate p-2 text-xs text-slate-600">{img.alt}</p>}
-              <div className="border-t border-slate-100 p-2">
-                <button
-                  type="button"
-                  onClick={() => handleDelete(img.id)}
-                  className="text-xs text-red-600 hover:underline"
-                >
-                  Удалить
-                </button>
-              </div>
+              {editingId === img.id ? (
+                <div className="border-t border-slate-100 p-2 space-y-2">
+                  <label className="block text-xs text-slate-500">Подпись (alt)</label>
+                  <input
+                    type="text"
+                    value={editAlt}
+                    onChange={(e) => setEditAlt(e.target.value)}
+                    className="w-full rounded border border-slate-200 px-2 py-1 text-sm"
+                    placeholder="Подпись"
+                  />
+                  <label className="block text-xs text-slate-500">Комментарий</label>
+                  <textarea
+                    value={editComment}
+                    onChange={(e) => setEditComment(e.target.value)}
+                    className="w-full rounded border border-slate-200 px-2 py-1 text-sm min-h-[60px]"
+                    placeholder="Комментарий к работе"
+                    rows={2}
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => saveEdit(img.id, editAlt, editComment)}
+                      className="rounded bg-amber-600 px-2 py-1 text-xs text-white hover:bg-amber-700"
+                    >
+                      Сохранить
+                    </button>
+                    <button
+                      type="button"
+                      onClick={cancelEdit}
+                      className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50"
+                    >
+                      Отмена
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {(img.alt || img.comment) && (
+                    <div className="p-2 text-xs text-slate-600 space-y-0.5">
+                      {img.alt && <p className="truncate">{img.alt}</p>}
+                      {img.comment && <p className="text-slate-500 line-clamp-2">{img.comment}</p>}
+                    </div>
+                  )}
+                  <div className="border-t border-slate-100 p-2 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => startEdit(img)}
+                      className="text-xs text-amber-600 hover:underline"
+                    >
+                      Редактировать
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(img.id)}
+                      className="text-xs text-red-600 hover:underline"
+                    >
+                      Удалить
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           ))}
         </div>
