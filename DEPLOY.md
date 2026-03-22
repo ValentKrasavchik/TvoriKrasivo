@@ -42,7 +42,9 @@ cd ..
 - `DATABASE_URL` — для прода можно оставить SQLite: `file:./prod.db`
 - `ADMIN_LOGIN` / `ADMIN_PASSWORD` — надёжные учётные данные
 - `JWT_SECRET` — длинная случайная строка
-- `CORS_ORIGIN` — домен сайта и админки; для основного сайта: `https://tvori-krasivo.ru` (при отдельном поддомене админки добавьте его через запятую)
+- `CORS_ORIGIN` — разрешённые origin через запятую, без пробелов. Для основного сайта с `www` и без:  
+  `https://tvori-krasivo.ru,https://www.tvori-krasivo.ru`  
+  (при отдельном поддомене админки добавьте его сюда же.)
 - `PORT` — порт API (например, 3001)
 
 ## 3. Systemd (backend)
@@ -63,14 +65,24 @@ sudo systemctl status tvori-krasivo-backend
 
 - Сайт и админка — статика из корня проекта и из `admin/dist`.
 - API — прокси на `http://127.0.0.1:3001`.
-- Для продакшена `server_name` и SSL обычно завязаны на **tvori-krasivo.ru**, чтобы главная открывалась как **https://tvori-krasivo.ru/**.
+- Для продакшена типичные **`server_name`**: `tvori-krasivo.ru` и `www.tvori-krasivo.ru`, **HTTPS** (`listen 443 ssl`), сертификаты Let's Encrypt.
 
-Пример (замените **`APP_ROOT`**; для прода укажите `server_name tvori-krasivo.ru` и отдельный `server` с `listen 443 ssl`):
+**Готовый пример под прод** лежит в репозитории: **`nginx-tvori-krasivo.conf`**. Скопируйте его на сервер (например в `/etc/nginx/sites-available/tvori-krasivo`), подставьте **`APP_ROOT`** в директивах `root` и `alias`, проверьте `sudo nginx -t`, включите сайт и перезагрузите nginx.
+
+Сертификаты: после того как DNS **A/AAAA** для `tvori-krasivo.ru` указывают на этот VPS:
+
+```bash
+sudo certbot --nginx -d tvori-krasivo.ru -d www.tvori-krasivo.ru
+```
+
+(либо `certbot certonly` и пропишите пути к `fullchain.pem` / `privkey.pem` в конфиге.)
+
+Упрощённый фрагмент (детали и редирект HTTP→HTTPS — в **`nginx-tvori-krasivo.conf`**):
 
 ```nginx
 server {
-    listen 80;
-    server_name tvori-krasivo.ru;
+    listen 443 ssl http2;
+    server_name tvori-krasivo.ru www.tvori-krasivo.ru;
     root /var/www/TvoriKrasivo;
     index index.html;
 
@@ -83,18 +95,7 @@ server {
         try_files $uri $uri/ /admin/index.html;
     }
 
-    location /api {
-        proxy_pass http://127.0.0.1:3001;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    # Если админка собрана с префиксом (запросы вида /gonchar/1/api/...), без этого блока
-    # GET может работать из кэша, а PATCH вернёт HTML:
-    location /gonchar/1/api/ {
+    location /api/ {
         proxy_pass http://127.0.0.1:3001/api/;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
@@ -102,8 +103,12 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
+
+    # ssl_certificate / ssl_certificate_key — см. полный файл nginx-tvori-krasivo.conf
 }
 ```
+
+Для старого тестового префикса `/gonchar/1/` (если ещё используется на другом хосте) может понадобиться отдельный `location` — см. исторические конфиги; для **tvori-krasivo.ru** с корня он не нужен.
 
 После правок: `sudo nginx -t && sudo systemctl reload nginx`.
 
@@ -168,9 +173,12 @@ cd ../admin && npm ci && npm run build
 
 ## Старая версия сайта после деплоя
 
+Изменения только в **репозитории** (в том числе в `DEPLOY.md`) **сами по себе не обновляют** живой сайт: нужен `git pull` на том VPS, куда указывает DNS для **tvori-krasivo.ru**, пересборка backend/admin при необходимости и **актуальный nginx** с `root`/`alias` на этот каталог.
+
 Проверьте по порядку:
 
-1. **`pwd` и nginx:** каталог `git pull` = каталог в `alias` / `root` nginx для этого URL (частая ошибка — обновили `TvoriKrasivo`, а nginx смотрит в `gonchar/1`).
-2. **Файл на диске:** `wc -c APP_ROOT/js/main.js` и сравнение с локальной сборкой; для API: `curl -sS http://127.0.0.1:3001/api/health`.
-3. **Кэш:** жёсткое обновление, инкремент `?v=` у `main.js` в `index.html`.
-4. **URL префикса:** основной прод — **https://tvori-krasivo.ru/** (`window.API_BASE` пустой, запросы на `/api/...`). Если тестируете по другому URL (например `https://хост/gonchar/1/`), в `index.html` должна срабатывать ветка с `window.API_BASE` для этого префикса; иначе запросы уйдут не туда.
+1. **DNS:** `tvori-krasivo.ru` (и при необходимости `www`) ведут на **тот** сервер, где вы делаете деплой.
+2. **`pwd` и nginx:** каталог `git pull` совпадает с `root` / `alias` в **активном** `server { ... }` для **tvori-krasivo.ru** (частая ошибка — обновили один каталог, а nginx отдаёт другой, например старый `gonchar/1` на другом IP).
+3. **Файл на диске:** на сервере `wc -c APP_ROOT/js/main.js` и при необходимости сравнение с репозиторием; API: `curl -sS http://127.0.0.1:3001/api/health`.
+4. **Кэш:** жёсткое обновление в браузере, инкремент `?v=` у `main.js` в `index.html` и новый деплой.
+5. **Основной прод [https://tvori-krasivo.ru/](https://tvori-krasivo.ru/):** для корня домена в `index.html` срабатывает ветка с **пустым** `window.API_BASE`, запросы идут на **`/api/...`** того же хоста. Префикс `/gonchar/1/` на тестовых стендах задаётся отдельной веткой в скрипте — не смешивайте с продом.
