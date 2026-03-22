@@ -2,15 +2,9 @@
 
 Инструкция по развёртыванию на VPS (например, 1 CPU, 1 ГБ RAM, 15 ГБ NVMe).
 
-**Каталог проекта на сервере** — **`APP_ROOT`**: каталог, куда клонирован репозиторий и откуда **nginx** отдаёт статику для **того URL, который вы открываете в браузере**.
+Эта инструкция — **только продакшен:** **[https://tvori-krasivo.ru/](https://tvori-krasivo.ru/)** на **отдельном VPS**. Стейджинг и другие тестовые сервера с ним **не связаны**: у каждого свой `APP_ROOT`, свой nginx и свой `git pull` — перенос на прод делается **заново** по шагам ниже на машине, куда указывает DNS для **tvori-krasivo.ru**.
 
-- **Прод:** **[https://tvori-krasivo.ru/](https://tvori-krasivo.ru/)** — обычно **`APP_ROOT=/var/www/TvoriKrasivo`** (корень сайта без префикса `/gonchar/1/`). См. **`nginx-tvori-krasivo.conf`**.
-- **Тестовый стенд с префиксом:** **[https://bot.epicpathfinder.ru:8443/gonchar/1/](https://bot.epicpathfinder.ru:8443/gonchar/1/)** — на сервере, где это настроено в nginx, статика идёт из **`APP_ROOT=/var/www/gonchar/1`** (`location /gonchar/1/` → `alias …/gonchar/1/`).  
-  Если вы делаете `git pull` в **`/var/www/TvoriKrasivo`** (или на другой машине), **эта ссылка не изменится**: обновлять нужно **тот же каталог, который указан в `alias` для `/gonchar/1/`**, и делать это **на том VPS**, куда смотрит `bot.epicpathfinder.ru`.
-
-Главное правило: **`git pull`, systemd и nginx должны смотреть в один и тот же `APP_ROOT`** для выбранного URL. Иначе в браузере останется старая вёрстка.
-
-**Публичный прод** — домен **tvori-krasivo.ru**; стенд **epicpathfinder** — отдельная конфигурация с префиксом и своим `CORS_ORIGIN` (при необходимости добавьте `https://bot.epicpathfinder.ru:8443` в `CORS_ORIGIN` на бэкенде этого сервера).
+**`APP_ROOT`** — каталог клона репозитория на **прод-сервере**, обычно **`/var/www/TvoriKrasivo`**. Его же должны использовать **nginx** (`root` / `alias`), **systemd** (`WorkingDirectory` для бэкенда) и команды `git pull` — иначе после деплоя в браузере останется старая версия.
 
 ## Что нужно на сервере
 
@@ -114,8 +108,6 @@ server {
 }
 ```
 
-Для старого тестового префикса `/gonchar/1/` (если ещё используется на другом хосте) может понадобиться отдельный `location` — см. исторические конфиги; для **tvori-krasivo.ru** с корня он не нужен.
-
 После правок: `sudo nginx -t && sudo systemctl reload nginx`.
 
 ## 5. Чеклист перед запуском
@@ -128,23 +120,23 @@ server {
 - [ ] Админка собрана, содержимое `admin/dist` отдаётся по URL админки
 - [ ] На сайте в production не задаётся жёстко «чужой» API: для своего домена `window.API_BASE` не должен указывать на старый сервер (см. логику в `index.html`)
 
-## 6. Обновление на сервере после выхода коммитов в `main`
+## 6. Обновление на прод-сервере (после коммитов в `main`)
 
-Дальше **`APP_ROOT`** — каталог репозитория **для того URL, который вы проверяете** (см. блок выше: **tvori-krasivo.ru** vs **bot.epicpathfinder.ru…/gonchar/1/**).
+Все команды — на **VPS для tvori-krasivo.ru**, в **`APP_ROOT`** (ниже — **`/var/www/TvoriKrasivo`**).
 
 ### 6.1. Если ещё не на ветке `main`
 
 ```bash
-cd /var/www/TvoriKrasivo   # подставьте свой APP_ROOT, напр. /var/www/gonchar/1 для стенда epicpathfinder
+cd /var/www/TvoriKrasivo
 git fetch origin
 git checkout main
 git pull origin main
 ```
 
-### 6.2. Полный цикл деплоя (типичный)
+### 6.2. Полный цикл деплоя
 
 ```bash
-cd /var/www/TvoriKrasivo   # замените на ваш APP_ROOT
+cd /var/www/TvoriKrasivo
 
 git pull origin main
 ```
@@ -159,7 +151,7 @@ git pull origin main
 
 Убедитесь, что ветка **`main`** и рабочая копия **чистая** (или осознанно мержите конфликты).
 
-**Nginx (если меняли шаблон в репо):** скопируйте и подключите **`nginx-tvori-krasivo.conf`** только для продакшена **tvori-krasivo.ru**; подставьте **`APP_ROOT`** в `root` и `alias`, при необходимости выполните **certbot**. Для стенда **epicpathfinder** конфиг обычно уже лежит в `/etc/nginx/` отдельно — правки в репозитории его сами не подменяют.
+**Nginx (если меняли шаблон в репо):** скопируйте и подключите **`nginx-tvori-krasivo.conf`**, подставьте **`APP_ROOT`** в `root` и `alias`, при необходимости **certbot** для **tvori-krasivo.ru**.
 
 ```bash
 sudo nginx -t && sudo systemctl reload nginx
@@ -168,7 +160,7 @@ sudo nginx -t && sudo systemctl reload nginx
 **Backend** (одна цепочка):
 
 ```bash
-cd /var/www/TvoriKrasivo/backend   # тот же APP_ROOT
+cd /var/www/TvoriKrasivo/backend
 
 npm ci
 npx prisma generate
@@ -180,7 +172,7 @@ sudo systemctl status tvori-krasivo-backend
 # при ошибках: sudo journalctl -u tvori-krasivo-backend -n 50 --no-pager
 ```
 
-**Админка** (перед `npm run build` проверьте **`admin/.env.production`**): для стенда **`/gonchar/1/`** — `VITE_API_BASE=/gonchar/1`; для **tvori-krasivo.ru** с корня — обычно **`VITE_API_BASE=`** (пусто), иначе запросы уйдут на неверный префикс.
+**Админка** для **tvori-krasivo.ru**: в **`admin/.env.production`** задайте **`VITE_API_BASE=`** (пусто), затем сборка:
 
 ```bash
 cd /var/www/TvoriKrasivo/admin
@@ -191,28 +183,9 @@ cd ..
 
 После выкладки — **жёсткое обновление** (Ctrl+F5) или смена `?v=` у `js/main.js` в `index.html`. Без перезапуска backend после обновления кода старый Node может отдавать API без корректного PATCH.
 
-### 6.3. Стенд `https://bot.epicpathfinder.ru:8443/gonchar/1/` — почему «ничего не меняется»
-
-Частая ошибка: следуете инструкции с **`cd /var/www/TvoriKrasivo`**, а сайт смотрите по ссылке с **`/gonchar/1/`**. Nginx для этого хоста отдаёт файлы из **`/var/www/gonchar/1/`** (не из `TvoriKrasivo`). Тогда нужно:
-
-```bash
-ssh на сервер, где крутится bot.epicpathfinder.ru
-cd /var/www/gonchar/1
-git pull origin main
-# дальше backend и admin из этого же каталога, как в §6.2
-```
-
-Проверка на сервере, откуда реально читается статика:
-
-```bash
-sudo grep -R "gonchar/1" /etc/nginx/sites-enabled/ /etc/nginx/sites-available/ 2>/dev/null
-```
-
-Должен быть **`alias`…`/gonchar/1/`** на каталог с репозиторием. **Юнит systemd** (`WorkingDirectory` в `tvori-krasivo-backend.service`) на этом же сервере должен указывать на **`…/gonchar/1/backend`**, а не на другой путь.
-
 ## 7. Короткое обновление (git pull уже сделан)
 
-Подставьте свой **`APP_ROOT`** (для стенда epicpathfinder — **`/var/www/gonchar/1`**).
+Перед сборкой админки: **`admin/.env.production`** с **`VITE_API_BASE=`** для прод-домена.
 
 ```bash
 cd /var/www/TvoriKrasivo/backend
@@ -237,7 +210,7 @@ cd ../admin && npm ci && npm run build
 Проверьте по порядку:
 
 1. **DNS:** `tvori-krasivo.ru` (и при необходимости `www`) ведут на **тот** сервер, где вы делаете деплой.
-2. **`pwd` и nginx:** каталог `git pull` совпадает с `root` / `alias` для **именно того URL**, который открываете (**tvori-krasivo.ru** — один каталог; **bot.epicpathfinder.ru/.../gonchar/1/** — как правило **`/var/www/gonchar/1`** на соответствующем VPS).
+2. **`pwd` и nginx:** каталог `git pull` на прод-сервере совпадает с `root` / `alias` для **https://tvori-krasivo.ru/**.
 3. **Файл на диске:** на сервере `wc -c APP_ROOT/js/main.js` и при необходимости сравнение с репозиторием; API: `curl -sS http://127.0.0.1:3001/api/health`.
 4. **Кэш:** жёсткое обновление в браузере, инкремент `?v=` у `main.js` в `index.html` и новый деплой.
-5. **Основной прод [https://tvori-krasivo.ru/](https://tvori-krasivo.ru/):** для корня домена в `index.html` срабатывает ветка с **пустым** `window.API_BASE`, запросы идут на **`/api/...`** того же хоста. Префикс `/gonchar/1/` на тестовых стендах задаётся отдельной веткой в скрипте — не смешивайте с продом.
+5. **Прод [https://tvori-krasivo.ru/](https://tvori-krasivo.ru/):** для корня домена в `index.html` срабатывает ветка с **пустым** `window.API_BASE`, запросы идут на **`/api/...`** того же хоста.
