@@ -4,6 +4,8 @@
 
 **Каталог проекта на сервере** дальше: `APP_ROOT` — по умолчанию **`/var/www/TvoriKrasivo`**. На уже настроенных машинах может быть **`/var/www/gonchar/1`**: это нормально, главное — **один и тот же путь** в `git`, **nginx** (`root` / `alias`) и **systemd** (`WorkingDirectory`, `ExecStart`). Если деплоите в `TvoriKrasivo`, а nginx отдаёт файлы из `gonchar/1` (или наоборот), в браузере будет **старая** вёрстка и логика.
 
+**Публичный сайт в продакшене** должен открываться по корню домена: **[https://tvori-krasivo.ru/](https://tvori-krasivo.ru/)** (без обязательного префикса вроде `/gonchar/1/`). Nginx и `CORS_ORIGIN` настройте под этот хост и HTTPS.
+
 ## Что нужно на сервере
 
 - Node.js 18+ (LTS)
@@ -40,7 +42,7 @@ cd ..
 - `DATABASE_URL` — для прода можно оставить SQLite: `file:./prod.db`
 - `ADMIN_LOGIN` / `ADMIN_PASSWORD` — надёжные учётные данные
 - `JWT_SECRET` — длинная случайная строка
-- `CORS_ORIGIN` — домен сайта и админки, например: `https://yourdomain.com,https://admin.yourdomain.com`
+- `CORS_ORIGIN` — домен сайта и админки; для основного сайта: `https://tvori-krasivo.ru` (при отдельном поддомене админки добавьте его через запятую)
 - `PORT` — порт API (например, 3001)
 
 ## 3. Systemd (backend)
@@ -61,13 +63,14 @@ sudo systemctl status tvori-krasivo-backend
 
 - Сайт и админка — статика из корня проекта и из `admin/dist`.
 - API — прокси на `http://127.0.0.1:3001`.
+- Для продакшена `server_name` и SSL обычно завязаны на **tvori-krasivo.ru**, чтобы главная открывалась как **https://tvori-krasivo.ru/**.
 
-Пример (замените `yourdomain.com` и **`APP_ROOT`**):
+Пример (замените **`APP_ROOT`**; для прода укажите `server_name tvori-krasivo.ru` и отдельный `server` с `listen 443 ssl`):
 
 ```nginx
 server {
     listen 80;
-    server_name yourdomain.com;
+    server_name tvori-krasivo.ru;
     root /var/www/TvoriKrasivo;
     index index.html;
 
@@ -106,6 +109,7 @@ server {
 
 ## 5. Чеклист перед запуском
 
+- [ ] Сайт доступен по **https://tvori-krasivo.ru/** (статика с корня, API через `/api` на том же хосте)
 - [ ] В `backend/.env` заданы `ADMIN_LOGIN`, `ADMIN_PASSWORD`, `JWT_SECRET`, `CORS_ORIGIN`
 - [ ] Выполнены `prisma migrate deploy` и при необходимости `prisma db seed`
 - [ ] Backend собран (`npm run build` в `backend/`) и запускается через systemd
@@ -169,4 +173,4 @@ cd ../admin && npm ci && npm run build
 1. **`pwd` и nginx:** каталог `git pull` = каталог в `alias` / `root` nginx для этого URL (частая ошибка — обновили `TvoriKrasivo`, а nginx смотрит в `gonchar/1`).
 2. **Файл на диске:** `wc -c APP_ROOT/js/main.js` и сравнение с локальной сборкой; для API: `curl -sS http://127.0.0.1:3001/api/health`.
 3. **Кэш:** жёсткое обновление, инкремент `?v=` у `main.js` в `index.html`.
-4. **URL префикса:** если сайт открыт как `https://хост/gonchar/1/`, в `index.html` должна срабатывать ветка с `window.API_BASE` для этого префикса; иначе запросы уйдут не туда.
+4. **URL префикса:** основной прод — **https://tvori-krasivo.ru/** (`window.API_BASE` пустой, запросы на `/api/...`). Если тестируете по другому URL (например `https://хост/gonchar/1/`), в `index.html` должна срабатывать ветка с `window.API_BASE` для этого префикса; иначе запросы уйдут не туда.
