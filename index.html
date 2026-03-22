@@ -35,18 +35,14 @@
     <div class="container">
       <div class="header-inner">
         <a href="#" class="logo" aria-label="Твори Красиво — на главную">
-          <!-- Иконка ваз -->
-          <svg class="logo-icon" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M10 28C10 28 8 28 7 26C6 24 6 20 7 16C8 12 10 10 10 8C10 6 9 4 9 4H15C15 4 14 6 14 8C14 10 16 12 17 16C18 20 18 24 17 26C16 28 14 28 14 28H10Z" fill="currentColor" fill-opacity="0.3" stroke="currentColor" stroke-width="1.5"/>
-            <path d="M20 28C20 28 19 28 18.5 27C18 26 18 24 18.5 21C19 18 20 16 20 15C20 14 19.5 13 19.5 13H24.5C24.5 13 24 14 24 15C24 16 25 18 25.5 21C26 24 26 26 25.5 27C25 28 24 28 24 28H20Z" fill="currentColor" fill-opacity="0.6" stroke="currentColor" stroke-width="1.5"/>
-          </svg>
-          Твори Красиво
+          <span class="sr-only">Твори Красиво</span>
+          <img src="логотип.svg" class="logo-image" alt="Твори Красиво — студия керамики">
         </a>
         
         <nav class="nav" aria-label="Основная навигация">
           <ul class="nav-list">
             <li><a href="#about" class="nav-link">О студии</a></li>
-            <li><a href="#workshops" class="nav-link">Мастер-классы</a></li>
+            <li><a href="#" data-action="open-schedule" class="nav-link">Мастер-классы</a></li>
             <li><a href="#gallery" class="nav-link">Галерея</a></li>
             <li><a href="#reviews" class="nav-link">Отзывы</a></li>
             <li><a href="#faq" class="nav-link">FAQ</a></li>
@@ -54,7 +50,7 @@
           </ul>
         </nav>
         
-        <a href="#workshops" class="btn btn-primary btn-sm header-cta">Записаться</a>
+        <a href="#" data-action="open-schedule" class="btn btn-primary btn-sm header-cta">Записаться</a>
         
         <!-- Мобильное меню -->
         <button class="mobile-menu-btn" aria-label="Открыть меню" aria-expanded="false" id="mobileMenuBtn">
@@ -69,14 +65,14 @@
     <nav class="mobile-nav" id="mobileNav" aria-label="Мобильная навигация">
       <ul class="mobile-nav-list">
         <li><a href="#about" class="mobile-nav-link">О студии</a></li>
-        <li><a href="#workshops" class="mobile-nav-link">Мастер-классы</a></li>
+        <li><a href="#" data-action="open-schedule" class="mobile-nav-link">Мастер-классы</a></li>
         <li><a href="#gallery" class="mobile-nav-link">Галерея</a></li>
         <li><a href="#reviews" class="mobile-nav-link">Отзывы</a></li>
         <li><a href="#faq" class="mobile-nav-link">FAQ</a></li>
         <li><a href="#contacts" class="mobile-nav-link">Контакты</a></li>
       </ul>
       <div class="mobile-nav-cta">
-        <a href="#workshops" class="btn btn-primary btn-lg" style="width: 100%;">Записаться на мастер-класс</a>
+        <a href="#" data-action="open-schedule" class="btn btn-primary btn-lg" style="width: 100%;">Записаться на мастер-класс</a>
       </div>
     </nav>
   </header>
@@ -97,7 +93,7 @@
             У нас тепло, спокойно и всё получается — даже у тех, кто впервые берёт глину в руки.
           </p>
           <div class="hero-buttons">
-            <a href="#workshops" class="btn btn-primary btn-lg">Выбрать мастер-класс</a>
+            <a href="#" data-action="open-schedule" class="btn btn-primary btn-lg">Выбрать мастер-класс</a>
             <a href="#about" class="btn btn-secondary btn-lg">Узнать больше</a>
           </div>
         </div>
@@ -186,22 +182,8 @@
               Здесь нет правильного и неправильного — только ваше творчество. Мы бережно проведём вас через 
               весь процесс: от первого прикосновения к глине до готового изделия после обжига.
             </p>
-            <a href="#workshops" class="btn btn-primary">Записаться на мастер-класс</a>
+            <a href="#" data-action="open-schedule" class="btn btn-primary">Записаться на мастер-класс</a>
           </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ========== МАСТЕР-КЛАССЫ ========== -->
-    <section class="section workshops" id="workshops">
-      <div class="container">
-        <div class="section-header">
-          <h2>Мастер-классы</h2>
-          <p class="section-subtitle">Выберите формат, который подходит именно вам, и создайте своё первое изделие</p>
-        </div>
-        
-        <div class="workshops-grid" id="workshopsGrid">
-          <!-- Карточки генерируются через JavaScript -->
         </div>
       </div>
     </section>
@@ -248,8 +230,7 @@
               или конкретный мастер-класс. Срок действия — 6 месяцев.
             </p>
             <p class="certificate-text" style="margin-bottom: 1.5rem;">
-              <strong>Идеальный подарок</strong> на день рождения, 8 марта или просто так — 
-              для тех, кто любит что-то новое.
+              Идеальный подарок по любому поводу для тех, кто любит что-то новое.
             </p>
             <a href="#contacts" class="btn btn-primary">Заказать сертификат</a>
           </div>
@@ -316,7 +297,7 @@
             <p class="footer-instagram-disclaimer">* Instagram принадлежит компании Meta Platforms Inc., которая признана экстремистской организацией в России</p>
           </div>
           <div class="footer-cta">
-            <a href="#workshops" class="btn btn-outline" style="border-color: rgba(255,255,255,0.3); color: white;">
+            <a href="#" data-action="open-schedule" class="btn btn-outline" style="border-color: rgba(255,255,255,0.3); color: white;">
               Записаться на мастер-класс
             </a>
           </div>
@@ -423,6 +404,238 @@
     </div>
   </div>
 
+  <!-- Модалка заявки: Хочу мастер-класс -->
+  <div class="modal-overlay" id="requestWorkshopModal" role="dialog" aria-modal="true" aria-labelledby="requestWorkshopTitle" style="display: none;">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title" id="requestWorkshopTitle">Хочу мастер-класс</h3>
+        <button class="modal-close" aria-label="Закрыть" id="closeRequestWorkshopModal">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <form id="requestWorkshopForm" class="booking-form-simple">
+          <div class="form-group">
+            <label class="form-label" for="requestWorkshopId">Мастер-класс <span class="required">*</span></label>
+            <select class="form-select" id="requestWorkshopId" required>
+              <option value="">Выберите мастер-класс</option>
+            </select>
+          </div>
+          <div class="request-workshop-info" id="requestWorkshopInfo" aria-live="polite" style="display: none;">
+            <p class="request-workshop-info__description" id="requestWorkshopInfoDescription"></p>
+            <p class="request-workshop-info__price" id="requestWorkshopInfoPrice"></p>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="requestDateTime">Дата и время <span class="required">*</span></label>
+            <input type="datetime-local" class="form-input" id="requestDateTime" step="300" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="requestName">Ваше имя <span class="required">*</span></label>
+            <input type="text" class="form-input" id="requestName" required placeholder="Как к вам обращаться?">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="requestPhone">Телефон <span class="required">*</span></label>
+            <input type="tel" class="form-input" id="requestPhone" required placeholder="+7 (___) ___-__-__">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="requestMessenger">Как с вами связаться? <span class="required">*</span></label>
+            <select class="form-select" id="requestMessenger" required>
+              <option value="">Выберите мессенджер</option>
+              <option value="telegram">Telegram</option>
+              <option value="whatsapp">WhatsApp</option>
+              <option value="phone">Телефонный звонок</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="requestParticipants">Количество участников</label>
+            <select class="form-select" id="requestParticipants"></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="requestComment">Комментарий</label>
+            <textarea class="form-textarea" id="requestComment" placeholder="Комментарий к заявке..."></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-checkbox">
+              <input type="checkbox" id="requestConsent" required>
+              <span class="form-checkbox-text">Я согласен(а) на обработку персональных данных <span class="required">*</span></span>
+            </label>
+          </div>
+          <input type="text" id="requestHoneypot" style="position:absolute;left:-9999px;opacity:0" tabindex="-1" autocomplete="off" aria-hidden="true">
+          <p class="form-error" id="requestWorkshopError" style="display:none;"></p>
+          <div class="form-actions">
+            <button type="button" class="btn btn-secondary" id="cancelRequestWorkshopModal">Отмена</button>
+            <button type="submit" class="btn btn-primary" id="requestWorkshopSubmitBtn">Отправить заявку</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Полноэкранная модалка: календарь + список мастер-классов (слоты), по клику — детали и запись -->
+  <div class="modal-overlay schedule-modal-overlay" id="scheduleModalOverlay" role="dialog" aria-modal="true" aria-labelledby="scheduleModalTitle" style="display: none;">
+    <!-- Спейсер и top-section — прямые дети overlay, чтобы sticky всегда был виден при любой прокрутке -->
+    <div class="schedule-modal__top-spacer" aria-hidden="true"></div>
+    <div class="schedule-modal__top-section" id="scheduleTopSection">
+        <header class="schedule-modal__header">
+          <button type="button" class="schedule-modal__back-header" id="scheduleHeaderBackBtn" aria-label="Назад">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <h2 class="schedule-modal__title" id="scheduleModalTitle">Расписание мастер-классов</h2>
+          <button type="button" class="schedule-modal__close" id="closeScheduleModal" aria-label="Закрыть">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </header>
+        <div class="schedule-modal__detail-carousel-wrap">
+          <div class="schedule-modal__detail-carousel" id="scheduleDetailCarousel">
+            <a href="#" class="schedule-detail-carousel__item" data-action="pick-slot">
+              <span class="schedule-detail-carousel__icon" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="18" rx="2.5"/><path d="M3 10h18"/><path d="M8 3v4M16 3v4"/><circle cx="12" cy="15" r="2"/></svg>
+              </span>
+              <span class="schedule-detail-carousel__text">Подобрать окошко для праздника</span>
+              <span class="schedule-detail-carousel__arrow" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+              </span>
+            </a>
+            <a href="https://t.me/Tvorikrasivo_ceramics" class="schedule-detail-carousel__item" data-action="telegram" target="_blank" rel="noopener">
+              <span class="schedule-detail-carousel__icon" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg>
+              </span>
+              <span class="schedule-detail-carousel__text">Записаться через телеграмм</span>
+              <span class="schedule-detail-carousel__arrow" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+              </span>
+            </a>
+            <a href="https://t.me/Tvorikrasivo_ceramics" class="schedule-detail-carousel__item" data-action="certificate" target="_blank" rel="noopener">
+              <span class="schedule-detail-carousel__icon" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12v10H4V12"/><path d="M2 7h20v5H2z"/><path d="M12 22V7"/><path d="M12 7H7.5a2.5 2.5 0 010-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 000-5C13 2 12 7 12 7z"/></svg>
+              </span>
+              <span class="schedule-detail-carousel__text">Купить сертификат</span>
+              <span class="schedule-detail-carousel__arrow" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+              </span>
+            </a>
+          </div>
+        </div>
+        <div class="schedule-modal__tabs" id="scheduleTabs">
+          <button type="button" class="schedule-filter-chip is-active" id="scheduleAvailabilityFilterBtn">Есть места</button>
+          <button type="button" class="schedule-filter-chip" id="scheduleWorkshopFilterBtn">Мастер-классы</button>
+          <button type="button" class="schedule-filter-chip" id="schedulePriceFilterBtn">Цена</button>
+          <span class="schedule-modal__tabs-extra" id="scheduleDateChipWrap"></span>
+        </div>
+        <div class="schedule-modal__calendar-wrap">
+          <div class="schedule-modal__calendar-nav">
+            <span class="schedule-modal__calendar-month" id="scheduleCalendarMonth">Март 2026</span>
+            <div class="schedule-modal__calendar-switches">
+              <button type="button" class="schedule-modal__calendar-prev" id="scheduleCalendarPrev" aria-label="Предыдущий месяц"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg></button>
+              <button type="button" class="schedule-modal__calendar-next" id="scheduleCalendarNext" aria-label="Следующий месяц"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></button>
+            </div>
+          </div>
+          <div class="schedule-modal__weekdays" id="scheduleWeekdays"><!-- ПН–ВС --></div>
+          <div class="schedule-modal__dates" id="scheduleCalendarDates"><!-- числа --></div>
+          <button type="button" class="schedule-modal__calendar-expand" id="scheduleCalendarExpand" aria-label="Раскрыть календарь на месяц"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button>
+        </div>
+    </div>
+    <div class="schedule-modal schedule-modal--fullscreen">
+      <!-- Экран 1: список слотов -->
+      <div class="schedule-modal__screen schedule-modal__screen--list" id="scheduleScreenList">
+        <div class="schedule-modal__list-wrap" id="scheduleListWrap">
+          <div class="schedule-modal__list-hint" id="scheduleListHint">Загрузка…</div>
+          <div class="schedule-modal__slot-list" id="scheduleSlotList"><!-- карточки слотов --></div>
+        </div>
+      </div>
+
+      <!-- Экран 2: детали мастер-класса + карусель действий -->
+      <div class="schedule-modal__screen schedule-modal__screen--detail" id="scheduleScreenDetail" hidden>
+        <header class="schedule-modal__detail-header">
+          <button type="button" class="schedule-modal__back" id="scheduleDetailBack" aria-label="Назад к списку">‹ Назад</button>
+        </header>
+        <div class="schedule-modal__detail-body" id="scheduleDetailBody"><!-- заполняется из JS --></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модалка: информация о мастер-классе (по клику на иконку глаза) -->
+  <div class="modal-overlay workshop-preview-modal" id="workshopPreviewModal" role="dialog" aria-modal="true" aria-labelledby="workshopPreviewTitle" style="display: none;">
+    <div class="modal workshop-preview-modal__inner">
+      <div class="modal-header">
+        <h2 class="modal-title" id="workshopPreviewTitle">Мастер-класс</h2>
+        <button type="button" class="modal-close" id="closeWorkshopPreviewModal" aria-label="Закрыть">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="workshop-preview-modal__body">
+        <div class="workshop-preview-modal__image-wrap" id="workshopPreviewImageWrap">
+          <img class="workshop-preview-modal__image" id="workshopPreviewImage" src="" alt="">
+        </div>
+        <div class="workshop-preview-modal__content" id="workshopPreviewContent">
+          <h3 class="workshop-preview-modal__title" id="workshopPreviewTitleH3"></h3>
+          <p class="workshop-preview-modal__meta" id="workshopPreviewMeta"></p>
+          <div class="workshop-preview-modal__description" id="workshopPreviewDescription"></div>
+          <div class="workshop-preview-modal__actions">
+            <button type="button" class="btn btn-primary" id="workshopPreviewBookBtn">Запись на мастер-класс</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модалка фильтра: мастер-классы -->
+  <div class="modal-overlay schedule-filter-modal" id="scheduleWorkshopFilterModal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="scheduleWorkshopFilterTitle">
+    <div class="modal schedule-filter-modal__inner">
+      <div class="modal-header">
+        <h3 class="modal-title" id="scheduleWorkshopFilterTitle">Фильтр: Мастер-классы</h3>
+        <button class="modal-close" aria-label="Закрыть" id="closeScheduleWorkshopFilterModal">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div id="scheduleWorkshopFilterOptions" class="schedule-filter-options"></div>
+        <div class="schedule-filter-actions">
+          <button type="button" class="btn btn-secondary" id="scheduleWorkshopFilterReset">Сбросить</button>
+          <button type="button" class="btn btn-primary" id="scheduleWorkshopFilterApply">Применить</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модалка фильтра: цена -->
+  <div class="modal-overlay schedule-filter-modal" id="schedulePriceFilterModal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="schedulePriceFilterTitle">
+    <div class="modal schedule-filter-modal__inner">
+      <div class="modal-header">
+        <h3 class="modal-title" id="schedulePriceFilterTitle">Фильтр: Цена</h3>
+        <button class="modal-close" aria-label="Закрыть" id="closeSchedulePriceFilterModal">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="schedule-price-filter-grid">
+          <div class="form-group">
+            <label class="form-label" for="schedulePriceMinInput">От, ₽</label>
+            <input class="form-input" type="number" min="0" step="100" id="schedulePriceMinInput" placeholder="0">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="schedulePriceMaxInput">До, ₽</label>
+            <input class="form-input" type="number" min="0" step="100" id="schedulePriceMaxInput" placeholder="0">
+          </div>
+        </div>
+        <p class="schedule-price-filter-hint" id="schedulePriceFilterHint"></p>
+        <div class="schedule-filter-actions">
+          <button type="button" class="btn btn-secondary" id="schedulePriceFilterReset">Сбросить</button>
+          <button type="button" class="btn btn-primary" id="schedulePriceFilterApply">Применить</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Модалка: обзор слотов по дням месяца (календарь-иконка в форме записи) -->
   <div class="modal-overlay slots-overview-modal" id="slotsOverviewModal" role="dialog" aria-modal="true" aria-labelledby="slotsOverviewTitle" style="display: none;">
     <div class="modal slots-overview-modal-inner">
@@ -498,6 +711,7 @@
     <div class="lightbox-content">
       <button class="lightbox-close" aria-label="Закрыть" id="closeLightbox">&times;</button>
       <img src="" alt="" id="lightboxImage">
+      <div class="lightbox-caption" id="lightboxCaption"></div>
     </div>
   </div>
 

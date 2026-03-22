@@ -19,8 +19,12 @@ type Slot = {
   bookedSeats?: number;
   heldSeats?: number;
   status: string;
-  workshop?: { durationMinutes?: number };
+  workshop?: { id?: string; durationMinutes?: number };
 };
+
+function slotWorkshopId(s: Slot): string {
+  return (s.workshopId || s.workshop?.id || '').trim();
+}
 
 function getInitialWeek() {
   const d = new Date();
@@ -35,6 +39,21 @@ function getInitialWeek() {
 }
 
 type WorkshopOption = { id: string; label: string; durationMinutes: number };
+
+function toDateTimeLocalValue(date: string, time: string) {
+  if (!date) return '';
+  const safeTime = time && time.length >= 5 ? time.slice(0, 5) : '12:00';
+  return `${date}T${safeTime}`;
+}
+
+function fromDateTimeLocalValue(value: string) {
+  if (!value) return { date: '', time: '' };
+  const [datePart, timePart = '12:00'] = value.split('T');
+  return {
+    date: datePart || '',
+    time: (timePart || '12:00').slice(0, 5),
+  };
+}
 
 function slotToEvent(s: Slot) {
   const free = s.freeSeats ?? s.capacity ?? 0;
@@ -67,6 +86,8 @@ export default function Calendar() {
   const [modal, setModal] = useState<{
     type: 'create' | 'edit';
     slot?: Slot;
+    /** id слота из API — не полагаться только на объект из FullCalendar */
+    slotId?: string;
     date?: string;
     time?: string;
     createDateRange?: { dateFrom: string; dateTo: string };
@@ -75,7 +96,12 @@ export default function Calendar() {
   const [slotsOverviewOpen, setSlotsOverviewOpen] = useState(false);
   const [overviewCountByDay, setOverviewCountByDay] = useState<Record<string, number>>({});
   const [overviewMonthYear, setOverviewMonthYear] = useState<{ year: number; month: number } | null>(null);
+  const [dateTimeLocal, setDateTimeLocal] = useState('');
+  const [createScope, setCreateScope] = useState<'single' | 'week' | 'month'>('single');
+  const [createProgress, setCreateProgress] = useState<string | null>(null);
   const calendarRef = useRef<FullCalendar>(null);
+  /** Синхронное значение выбранного мастер-класса в модалке (state может отставать от submit) */
+  const modalWorkshopIdRef = useRef<string>('');
   const workshopIdRef = useRef(workshopId);
   workshopIdRef.current = workshopId;
 
@@ -123,8 +149,27 @@ export default function Calendar() {
       time = `${String(arg.date.getHours()).padStart(2, '0')}:${String(arg.date.getMinutes()).padStart(2, '0')}`;
     }
     const duration = getWorkshopDuration(workshopId);
+    modalWorkshopIdRef.current = workshopId;
     setForm({ workshopId, date: dateStr, time, capacity: 6, freeze: false, durationMinutes: duration });
+    setDateTimeLocal(toDateTimeLocalValue(dateStr, time));
     setModal({ type: 'create', date: dateStr });
+    setCreateScope('single');
+    setCreateProgress(null);
+    setError('');
+  }
+
+  function openCreateFromButton() {
+    const api = calendarRef.current?.getApi();
+    const base = api?.getDate() ?? new Date();
+    const dateStr = `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, '0')}-${String(base.getDate()).padStart(2, '0')}`;
+    const time = '12:00';
+    const duration = getWorkshopDuration(workshopId);
+    modalWorkshopIdRef.current = workshopId;
+    setForm({ workshopId, date: dateStr, time, capacity: 6, freeze: false, durationMinutes: duration });
+    setDateTimeLocal(toDateTimeLocalValue(dateStr, time));
+    setModal({ type: 'create', date: dateStr });
+    setCreateScope('single');
+    setCreateProgress(null);
     setError('');
   }
 
@@ -141,7 +186,9 @@ export default function Calendar() {
       ? '00:00'
       : `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`;
     const diffMinutes = Math.max(1, Math.round((selectInfo.end.getTime() - selectInfo.start.getTime()) / 60000));
+    modalWorkshopIdRef.current = workshopId;
     setForm({ workshopId, date: dateStr, time, capacity: 6, freeze: true, durationMinutes: diffMinutes });
+    setDateTimeLocal(toDateTimeLocalValue(dateStr, time));
 
     let createDateRange: { dateFrom: string; dateTo: string } | undefined;
     if (isAllDay && selectInfo.startStr && selectInfo.endStr) {
@@ -161,15 +208,18 @@ export default function Calendar() {
   }
 
   function openEdit(slot: Slot) {
+    const sw = slotWorkshopId(slot);
+    modalWorkshopIdRef.current = sw;
     setForm({
-      workshopId: slot.workshopId,
+      workshopId: sw,
       date: slot.date,
       time: slot.time,
       capacity: slot.capacity,
       freeze: slot.status === 'HELD',
       durationMinutes: slot.durationMinutes ?? slot.workshop?.durationMinutes ?? 120,
     });
-    setModal({ type: 'edit', slot });
+    setDateTimeLocal(toDateTimeLocalValue(slot.date, slot.time));
+    setModal({ type: 'edit', slot, slotId: String(slot.id) });
     setError('');
   }
 
@@ -185,16 +235,60 @@ export default function Calendar() {
 
   async function handleCreate() {
     setError('');
-    const wid = form.workshopId || workshopId;
-    if (!wid || !form.date || !form.time) {
-      setError('Укажите мастер-класс, дату и время');
+    const wid =
+      (modalWorkshopIdRef.current || '').trim() || form.workshopId || workshopId;
+    if (!wid) {
+      setError('Укажите мастер-класс');
+      return;
+    }
+    if (!form.date || !form.time) {
+      setError('Укажите дату и время');
       return;
     }
     setCreating(true);
+    setCreateProgress(null);
     try {
-      const payload = { ...form, workshopId: wid };
+      const payload = {
+        ...form,
+        workshopId: wid,
+        durationMinutes: form.durationMinutes,
+        capacity: form.capacity,
+      };
       const range = modal?.createDateRange;
       const api = calendarRef.current?.getApi();
+      const scope = createScope;
+
+      if (scope === 'week' || scope === 'month') {
+        const days = scope === 'week' ? 7 : 30;
+        const startDate = new Date((form.date || '').slice(0, 10) + 'T12:00:00');
+        if (isNaN(startDate.getTime())) {
+          setError('Укажите дату');
+          setCreating(false);
+          return;
+        }
+        const duration = getWorkshopDuration(wid);
+        const time = form.time && form.time.length >= 5 ? form.time.slice(0, 5) : '12:00';
+        for (let i = 0; i < days; i++) {
+          const d = new Date(startDate);
+          d.setDate(startDate.getDate() + i);
+          const dateStr = d.toISOString().slice(0, 10);
+          setCreateProgress(`${i + 1} / ${days}`);
+          await createSlot({
+            workshopId: wid,
+            date: dateStr,
+            time,
+            capacity: payload.capacity,
+            freeze: false,
+            durationMinutes: duration,
+          });
+        }
+        setCreateProgress(null);
+        setModal(null);
+        refetchEvents();
+        setCreating(false);
+        return;
+      }
+
       if (range) {
         const dates = getDatesInRange(range.dateFrom, range.dateTo);
         if (dates.length > 0) {
@@ -206,7 +300,7 @@ export default function Calendar() {
               time: '00:00',
               capacity: payload.capacity,
               freeze: true,
-              durationMinutes: duration,
+              durationMinutes: Math.max(1, payload.durationMinutes || duration),
             });
             if (api && created) api.addEvent(slotToEvent(created as Slot));
           }
@@ -229,13 +323,31 @@ export default function Calendar() {
 
   async function handleUpdate() {
     if (!modal?.slot) return;
+    const slotId = modal.slotId || String(modal.slot.id);
+    if (!slotId) {
+      setError('Не удалось определить id слота. Закройте окно и откройте слот снова.');
+      return;
+    }
     setError('');
+    const slotWid = slotWorkshopId(modal.slot);
+    const chosen =
+      (modalWorkshopIdRef.current || '').trim() || (form.workshopId || '').trim();
+    const wid = (chosen || slotWid).trim();
+    if (!wid) {
+      setError('Укажите мастер-класс');
+      return;
+    }
     try {
-      await updateSlot(modal.slot.id, {
+      await updateSlot(slotId, {
+        workshopId: wid,
         capacity: form.capacity,
         status: form.freeze ? 'HELD' : 'OPEN',
         durationMinutes: form.durationMinutes,
       });
+      if (chosen && chosen !== slotWid) {
+        workshopIdRef.current = chosen;
+        setWorkshopId(chosen);
+      }
       setModal(null);
       refetchEvents();
     } catch (e: any) {
@@ -303,6 +415,13 @@ export default function Calendar() {
     <div>
       <h1 className="mb-4 text-xl font-semibold text-slate-800 sm:text-2xl">Календарь слотов</h1>
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
+        <button
+          type="button"
+          onClick={openCreateFromButton}
+          className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 sm:w-auto"
+        >
+          Добавить
+        </button>
         <select
           value={workshopId}
           onChange={(e) => {
@@ -403,10 +522,18 @@ export default function Calendar() {
               <div>
                 <label className="block text-sm text-slate-600">Мастер-класс</label>
                 <select
-                  value={form.workshopId || workshopId}
-                  onChange={(e) => setForm((f) => ({ ...f, workshopId: e.target.value }))}
+                  value={
+                    modal.type === 'edit' && modal.slot
+                      ? form.workshopId || slotWorkshopId(modal.slot)
+                      : form.workshopId || workshopId
+                  }
+                  onChange={(e) => {
+                    const nextId = e.target.value;
+                    modalWorkshopIdRef.current = nextId;
+                    const nextDuration = getWorkshopDuration(nextId);
+                    setForm((f) => ({ ...f, workshopId: nextId, durationMinutes: nextDuration }));
+                  }}
                   className="mt-1 w-full rounded border px-3 py-2"
-                  disabled={modal.type === 'edit'}
                 >
                   <option value="">Выберите мастер-класс</option>
                   {workshops.map((w) => (
@@ -416,6 +543,36 @@ export default function Calendar() {
                   ))}
                 </select>
               </div>
+              {modal.type === 'create' && !modal.createDateRange && (
+                <div>
+                  <label className="block text-sm text-slate-600 mb-1">Период</label>
+                  <div className="flex gap-2 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => setCreateScope('single')}
+                      className={`rounded-lg border px-3 py-2 text-sm font-medium ${createScope === 'single' ? 'border-amber-600 bg-amber-50 text-amber-800' : 'border-slate-300 text-slate-700 hover:bg-slate-50'}`}
+                    >
+                      Один слот
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCreateScope('week')}
+                      className={`rounded-lg border px-3 py-2 text-sm font-medium ${createScope === 'week' ? 'border-amber-600 bg-amber-50 text-amber-800' : 'border-slate-300 text-slate-700 hover:bg-slate-50'}`}
+                    >
+                      На неделю
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCreateScope('month')}
+                      className={`rounded-lg border px-3 py-2 text-sm font-medium ${createScope === 'month' ? 'border-amber-600 bg-amber-50 text-amber-800' : 'border-slate-300 text-slate-700 hover:bg-slate-50'}`}
+                    >
+                      На месяц
+                    </button>
+                  </div>
+                  {createScope === 'week' && <p className="mt-1 text-xs text-slate-500">Будет создано 7 слотов (по одному в день с выбранной даты)</p>}
+                  {createScope === 'month' && <p className="mt-1 text-xs text-slate-500">Будет создано 30 слотов (по одному в день с выбранной даты)</p>}
+                </div>
+              )}
               {modal.createDateRange ? (
                 <div className="rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
                   С {modal.createDateRange.dateFrom} по {modal.createDateRange.dateTo} — будет создано{' '}
@@ -423,11 +580,17 @@ export default function Calendar() {
                 </div>
               ) : (
                 <div>
-                  <label className="block text-sm text-slate-600">Дата</label>
+                  <label className="block text-sm text-slate-600">Дата и время</label>
                   <input
-                    type="date"
-                    value={form.date}
-                    onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
+                    type="datetime-local"
+                    step={300}
+                    value={dateTimeLocal}
+                    onChange={(e) => {
+                      const next = e.target.value;
+                      setDateTimeLocal(next);
+                      const parsed = fromDateTimeLocalValue(next);
+                      setForm((f) => ({ ...f, date: parsed.date, time: parsed.time }));
+                    }}
                     className="mt-1 w-full rounded border px-3 py-2"
                     disabled={modal.type === 'edit'}
                   />
@@ -435,16 +598,6 @@ export default function Calendar() {
               )}
               {!modal.createDateRange && (
                 <>
-                  <div>
-                    <label className="block text-sm text-slate-600">Время</label>
-                    <input
-                      type="time"
-                      value={form.time}
-                      onChange={(e) => setForm((f) => ({ ...f, time: e.target.value }))}
-                      className="mt-1 w-full rounded border px-3 py-2"
-                      disabled={modal.type === 'edit'}
-                    />
-                  </div>
                   <div>
                     <label className="block text-sm text-slate-600">Вместимость</label>
                     <input
@@ -480,7 +633,7 @@ export default function Calendar() {
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    onClick={() => handleDelete(modal.slot!.id)}
+                    onClick={() => handleDelete(modal.slotId || String(modal.slot!.id))}
                     className="rounded bg-red-100 px-3 py-1 text-sm text-red-700 hover:bg-red-200"
                   >
                     Удалить
@@ -495,11 +648,15 @@ export default function Calendar() {
                   className="rounded-lg bg-amber-600 px-4 py-2 text-white hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {creating
-                    ? 'Создание…'
+                    ? (createProgress ? `Создание… ${createProgress}` : 'Создание…')
                     : modal.type === 'create' && modal.createDateRange
                       ? `Заморозить ${getDatesInRange(modal.createDateRange.dateFrom, modal.createDateRange.dateTo).length} дней`
                       : modal.type === 'create'
-                        ? 'Создать'
+                        ? createScope === 'week'
+                          ? 'Создать 7 слотов'
+                          : createScope === 'month'
+                            ? 'Создать 30 слотов'
+                            : 'Создать'
                         : 'Сохранить'}
                 </button>
                 <button type="button" onClick={() => setModal(null)} className="rounded-lg border px-4 py-2">

@@ -5,8 +5,8 @@
 cd "$(dirname "$0")"
 export NODE_ENV=production
 
-# Сборка, если нет dist или исходники новее
-if [ ! -d dist ] || [ src/index.ts -nt dist/index.js ]; then
+# Сборка, если нет dist/index.js или есть более новые файлы в src/prisma.
+if [ ! -f dist/index.js ] || find src prisma -type f -newer dist/index.js | grep -q .; then
   npm run build
 fi
 

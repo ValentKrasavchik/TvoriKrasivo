@@ -88,6 +88,17 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
+
+    # Если админка собрана с VITE_API_BASE=/gonchar/1 (запросы на /gonchar/1/api/...), без этого блока
+    # GET может случайно работать через кэш, а PATCH вернёт HTML и слот не обновится:
+    location /gonchar/1/api/ {
+        proxy_pass http://127.0.0.1:3001/api/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
 }
 ```
 
@@ -113,7 +124,12 @@ npm ci --omit=dev
 npx prisma migrate deploy
 npm run build
 sudo systemctl restart tvori-krasivo-backend
+```
 
-# Если обновляли админку — пересобрать и залить admin/dist
-cd ../admin && npm ci && npm run build
+После обновления backend обязательно перезапускайте сервис (`restart`), иначе старый процесс Node может отдавать API без разбора тела PATCH — смена мастер-класса в календаре «не сохранится».
+
+Если обновляли админку — пересобрать и залить `admin/dist`:
+
+```bash
+cd /var/www/gonchar/1/admin && npm ci && npm run build
 ```

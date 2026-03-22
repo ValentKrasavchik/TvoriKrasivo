@@ -7,6 +7,8 @@ import Bookings from './pages/Bookings';
 import Workshops from './pages/Workshops';
 import Reviews from './pages/Reviews';
 import Gallery from './pages/Gallery';
+import Contacts from './pages/Contacts';
+import NewWorkshopRequests from './pages/NewWorkshopRequests';
 import { getMe } from './lib/api';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -36,9 +38,11 @@ export default function App() {
         <Route index element={<Navigate to="/calendar" replace />} />
         <Route path="calendar" element={<Calendar />} />
         <Route path="bookings" element={<Bookings />} />
+        <Route path="new-workshop-requests" element={<NewWorkshopRequests />} />
         <Route path="workshops" element={<Workshops />} />
         <Route path="reviews" element={<Reviews />} />
         <Route path="gallery" element={<Gallery />} />
+        <Route path="contacts" element={<Contacts />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

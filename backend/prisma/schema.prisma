@@ -20,6 +20,7 @@ model Workshop {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
   slots            Slot[]
+  requests         WorkshopRequest[]
 }
 
 model Slot {
@@ -35,8 +36,30 @@ model Slot {
   updatedAt  DateTime @updatedAt
   bookings   Booking[]
   seatHolds   SeatHold[]
+  requestsConfirmed WorkshopRequest[] @relation("RequestConfirmedSlot")
 
   @@unique([workshopId, date, time])
+}
+
+model WorkshopRequest {
+  id              String   @id @default(uuid())
+  workshopId      String
+  workshop        Workshop @relation(fields: [workshopId], references: [id], onDelete: Restrict)
+  date            String   // YYYY-MM-DD
+  time            String   // HH:MM
+  name            String
+  phone           String
+  messenger       String
+  participants    Int      @default(1)
+  comment         String?
+  status          String   @default("NEW") // NEW, CONFIRMED
+  confirmedSlotId String?
+  confirmedSlot   Slot?    @relation("RequestConfirmedSlot", fields: [confirmedSlotId], references: [id], onDelete: SetNull)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([date, time])
 }
 
 model Booking {
@@ -90,6 +113,22 @@ model GalleryImage {
   id        String   @id @default(uuid())
   imageUrl  String
   alt       String?
+  comment   String?
   sortOrder Int      @default(0)
   createdAt DateTime @default(now())
+}
+
+/// Блоки секции «Контакты» на сайте: строка с иконкой или кнопка-ссылка
+model ContactBlock {
+  id             String   @id @default(uuid())
+  sortOrder      Int      @default(0)
+  blockType      String   // FIELD | BUTTON
+  label          String
+  value          String?
+  href           String?
+  variant        String?  // primary | secondary (для BUTTON)
+  iconKey        String
+  customIconUrl  String?  // при iconKey = custom — URL из /api/uploads/
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }

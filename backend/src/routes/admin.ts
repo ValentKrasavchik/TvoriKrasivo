@@ -6,6 +6,8 @@ import multer from 'multer';
 import { requireAdmin } from '../middleware/requireAdmin';
 import { prisma } from '../lib/prisma';
 import { getSlotsWithAvailability } from '../lib/slotAvailability';
+import { normalizePhone } from '../lib/validation';
+import { isAllowedContactHref, isAllowedContactIconKey, isAllowedCustomIconUrl } from '../lib/contactBlocks';
 
 const uploadsDir = path.join(process.cwd(), 'uploads');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
@@ -266,6 +268,7 @@ adminRouter.patch('/gallery/:id', async (req: Request, res: Response) => {
     const body = req.body || {};
     const data: any = {};
     if (body.alt !== undefined) data.alt = body.alt === '' ? null : String(body.alt);
+    if (body.comment !== undefined) data.comment = body.comment === '' ? null : String(body.comment);
     if (body.sortOrder !== undefined) data.sortOrder = parseInt(String(body.sortOrder), 10) || 0;
     const g = await prisma.galleryImage.update({ where: { id: req.params.id }, data });
     res.json(g);
@@ -369,16 +372,58 @@ adminRouter.patch('/slots/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const body = req.body || {};
-    const data: any = {};
+    const existing = await prisma.slot.findUnique({ where: { id } });
+    if (!existing) {
+      return res.status(404).json({ error: 'Slot not found' });
+    }
+
+    const data: Record<string, unknown> = {};
     if (body.status !== undefined && ['OPEN', 'HELD', 'CANCELLED'].includes(body.status)) {
       data.status = body.status;
     }
     if (body.capacity !== undefined) {
-      data.capacity = Math.max(1, parseInt(String(body.capacity), 10));
+      const c = parseInt(String(body.capacity), 10);
+      data.capacity = Number.isFinite(c) && c >= 1 ? c : 1;
     }
     if (body.durationMinutes !== undefined) {
-      data.durationMinutes = Math.max(1, parseInt(String(body.durationMinutes), 10));
+      const d = parseInt(String(body.durationMinutes), 10);
+      data.durationMinutes = Number.isFinite(d) && d >= 1 ? d : 1;
     }
+
+    const wantsWorkshopChange =
+      body.workshopId !== undefined && String(body.workshopId) !== existing.workshopId;
+
+    if (wantsWorkshopChange) {
+      const newWid = String(body.workshopId);
+      const ws = await prisma.workshop.findUnique({ where: { id: newWid } });
+      if (!ws) {
+        return res.status(404).json({ error: 'Workshop not found' });
+      }
+      const conflict = await prisma.slot.findFirst({
+        where: {
+          workshopId: newWid,
+          date: existing.date,
+          time: existing.time,
+          NOT: { id },
+        },
+      });
+      if (conflict) {
+        return res.status(409).json({
+          error: 'Уже есть слот этого мастер-класса на это время',
+        });
+      }
+      data.workshopId = newWid;
+      await prisma.$transaction(async (tx) => {
+        await tx.slot.update({ where: { id }, data });
+        await tx.booking.updateMany({
+          where: { slotId: id },
+          data: { workshopId: newWid },
+        });
+      });
+      const slot = await prisma.slot.findUnique({ where: { id } });
+      return res.json(slot);
+    }
+
     const slot = await prisma.slot.update({ where: { id }, data });
     res.json(slot);
   } catch (e) {
@@ -597,6 +642,279 @@ adminRouter.delete('/bookings/:id', async (req: Request, res: Response) => {
   } catch (e: any) {
     if (e.message === 'NOT_FOUND') return res.status(404).json({ error: 'Booking not found' });
     console.error('DELETE /api/admin/bookings/:id', e);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// --- Requests for new workshop slot ---
+adminRouter.get('/workshop-requests', async (_req: Request, res: Response) => {
+  try {
+    const list = await prisma.workshopRequest.findMany({
+      include: {
+        workshop: true,
+        confirmedSlot: true,
+      },
+      orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
+    });
+    res.json(list);
+  } catch (e) {
+    console.error('GET /api/admin/workshop-requests', e);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+adminRouter.patch('/workshop-requests/:id', async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id;
+    const body = req.body || {};
+    const existing = await prisma.workshopRequest.findUnique({ where: { id } });
+    if (!existing) return res.status(404).json({ error: 'Request not found' });
+    if (existing.status !== 'NEW') return res.status(409).json({ error: 'Можно редактировать только новые заявки' });
+
+    const data: any = {};
+    const nextWorkshopId = body.workshopId !== undefined ? String(body.workshopId) : existing.workshopId;
+    const nextDate = body.date !== undefined ? String(body.date) : existing.date;
+    const nextTime = body.time !== undefined ? String(body.time) : existing.time;
+
+    if (body.workshopId !== undefined) {
+      const ws = await prisma.workshop.findUnique({ where: { id: nextWorkshopId } });
+      if (!ws) return res.status(404).json({ error: 'Workshop not found' });
+      data.workshopId = nextWorkshopId;
+    }
+
+    if (body.date !== undefined) data.date = nextDate;
+    if (body.time !== undefined) data.time = nextTime;
+    if (body.name !== undefined) data.name = String(body.name).trim();
+    if (body.messenger !== undefined) data.messenger = String(body.messenger).trim();
+    if (body.comment !== undefined) data.comment = body.comment ? String(body.comment).trim() : null;
+    if (body.participants !== undefined) data.participants = Math.max(1, parseInt(String(body.participants), 10) || 1);
+    if (body.phone !== undefined) {
+      const normalized = normalizePhone(String(body.phone));
+      if (!normalized) return res.status(400).json({ error: 'Invalid phone number' });
+      data.phone = normalized;
+    }
+
+    if (nextDate !== existing.date || nextTime !== existing.time) {
+      const slotConflict = await prisma.slot.findFirst({
+        where: { date: nextDate, time: nextTime },
+        select: { id: true },
+      });
+      if (slotConflict) {
+        return res.status(409).json({ error: 'На эту дату и время уже есть мастер-класс' });
+      }
+    }
+
+    const updated = await prisma.workshopRequest.update({
+      where: { id },
+      data,
+      include: { workshop: true, confirmedSlot: true },
+    });
+    res.json(updated);
+  } catch (e) {
+    console.error('PATCH /api/admin/workshop-requests/:id', e);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+adminRouter.delete('/workshop-requests/:id', async (req: Request, res: Response) => {
+  try {
+    await prisma.workshopRequest.delete({ where: { id: req.params.id } });
+    res.status(204).send();
+  } catch (e: any) {
+    if (e?.code === 'P2025') return res.status(404).json({ error: 'Request not found' });
+    console.error('DELETE /api/admin/workshop-requests/:id', e);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// --- Контакты (блоки на сайте) ---
+adminRouter.get('/contacts', async (_req: Request, res: Response) => {
+  try {
+    const list = await prisma.contactBlock.findMany({ orderBy: { sortOrder: 'asc' } });
+    res.json({
+      blocks: list.map((b) => ({
+        id: b.id,
+        sortOrder: b.sortOrder,
+        blockType: b.blockType,
+        label: b.label,
+        value: b.value ?? null,
+        href: b.href ?? null,
+        variant: b.variant ?? null,
+        iconKey: b.iconKey,
+        customIconUrl: b.customIconUrl ?? null,
+      })),
+    });
+  } catch (e) {
+    console.error('GET /api/admin/contacts', e);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+adminRouter.put('/contacts', async (req: Request, res: Response) => {
+  try {
+    const raw = req.body?.blocks;
+    if (!Array.isArray(raw)) {
+      return res.status(400).json({ error: 'Ожидается массив blocks' });
+    }
+    if (raw.length > 40) {
+      return res.status(400).json({ error: 'Не более 40 блоков' });
+    }
+
+    const normalized: Array<{
+      sortOrder: number;
+      blockType: string;
+      label: string;
+      value: string | null;
+      href: string | null;
+      variant: string | null;
+      iconKey: string;
+      customIconUrl: string | null;
+    }> = [];
+
+    for (let i = 0; i < raw.length; i++) {
+      const b = raw[i] || {};
+      const blockType = String(b.blockType || '').toUpperCase();
+      if (blockType !== 'FIELD' && blockType !== 'BUTTON') {
+        return res.status(400).json({ error: `Блок ${i + 1}: неверный тип (FIELD или BUTTON)` });
+      }
+      const label = String(b.label ?? '').trim();
+      if (!label || label.length > 200) {
+        return res.status(400).json({ error: `Блок ${i + 1}: укажите заголовок (до 200 символов)` });
+      }
+      const iconKey = String(b.iconKey ?? '').trim();
+      if (!isAllowedContactIconKey(iconKey)) {
+        return res.status(400).json({ error: `Блок ${i + 1}: неизвестная иконка` });
+      }
+      let customIconUrl: string | null = null;
+      if (iconKey === 'custom') {
+        const u = String(b.customIconUrl ?? '').trim();
+        if (!isAllowedCustomIconUrl(u)) {
+          return res.status(400).json({
+            error: `Блок ${i + 1}: для «Своя иконка» загрузите файл изображения`,
+          });
+        }
+        customIconUrl = u;
+      }
+
+      if (blockType === 'FIELD') {
+        const value = b.value != null ? String(b.value) : '';
+        if (value.length > 4000) {
+          return res.status(400).json({ error: `Блок ${i + 1}: текст слишком длинный` });
+        }
+        normalized.push({
+          sortOrder: i,
+          blockType: 'FIELD',
+          label,
+          value,
+          href: null,
+          variant: null,
+          iconKey,
+          customIconUrl,
+        });
+      } else {
+        const href = String(b.href ?? '').trim();
+        if (!isAllowedContactHref(href)) {
+          return res.status(400).json({
+            error: `Блок ${i + 1}: укажите корректную ссылку (https://, http://, tel: или mailto:)`,
+          });
+        }
+        const variantRaw = String(b.variant ?? 'primary').toLowerCase();
+        const variant = variantRaw === 'secondary' ? 'secondary' : 'primary';
+        normalized.push({
+          sortOrder: i,
+          blockType: 'BUTTON',
+          label,
+          value: null,
+          href,
+          variant,
+          iconKey,
+          customIconUrl,
+        });
+      }
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.contactBlock.deleteMany();
+      if (normalized.length) {
+        await tx.contactBlock.createMany({
+          data: normalized.map((n) => ({
+            sortOrder: n.sortOrder,
+            blockType: n.blockType,
+            label: n.label,
+            value: n.value,
+            href: n.href,
+            variant: n.variant,
+            iconKey: n.iconKey,
+            customIconUrl: n.customIconUrl,
+          })),
+        });
+      }
+    });
+
+    const list = await prisma.contactBlock.findMany({ orderBy: { sortOrder: 'asc' } });
+    res.json({
+      blocks: list.map((b) => ({
+        id: b.id,
+        sortOrder: b.sortOrder,
+        blockType: b.blockType,
+        label: b.label,
+        value: b.value ?? null,
+        href: b.href ?? null,
+        variant: b.variant ?? null,
+        iconKey: b.iconKey,
+        customIconUrl: b.customIconUrl ?? null,
+      })),
+    });
+  } catch (e) {
+    console.error('PUT /api/admin/contacts', e);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+adminRouter.post('/workshop-requests/:id/confirm', async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id;
+    const result = await prisma.$transaction(async (tx) => {
+      const request = await tx.workshopRequest.findUnique({
+        where: { id },
+        include: { workshop: true },
+      });
+      if (!request) throw new Error('NOT_FOUND');
+      if (request.status !== 'NEW') throw new Error('NOT_NEW');
+
+      const conflict = await tx.slot.findFirst({
+        where: { date: request.date, time: request.time },
+        select: { id: true },
+      });
+      if (conflict) throw new Error('SLOT_CONFLICT');
+
+      const createdSlot = await tx.slot.create({
+        data: {
+          workshopId: request.workshopId,
+          date: request.date,
+          time: request.time,
+          capacity: request.workshop.capacityPerSlot,
+          durationMinutes: request.workshop.durationMinutes,
+          status: 'OPEN',
+        },
+      });
+
+      const updatedRequest = await tx.workshopRequest.update({
+        where: { id },
+        data: {
+          status: 'CONFIRMED',
+          confirmedSlotId: createdSlot.id,
+        },
+        include: { workshop: true, confirmedSlot: true },
+      });
+      return updatedRequest;
+    });
+    res.json(result);
+  } catch (e: any) {
+    if (e?.message === 'NOT_FOUND') return res.status(404).json({ error: 'Request not found' });
+    if (e?.message === 'NOT_NEW') return res.status(409).json({ error: 'Заявка уже обработана' });
+    if (e?.message === 'SLOT_CONFLICT') return res.status(409).json({ error: 'На эту дату и время уже есть мастер-класс' });
+    console.error('POST /api/admin/workshop-requests/:id/confirm', e);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

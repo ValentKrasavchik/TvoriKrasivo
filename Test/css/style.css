@@ -927,6 +927,13 @@ p {
   height: 24px;
 }
 
+.contact-icon img.contact-icon-img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  display: block;
+}
+
 .contact-label {
   font-size: 0.875rem;
   color: var(--color-text-muted);

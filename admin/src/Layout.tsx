@@ -48,6 +48,15 @@ export default function Layout() {
               >
                 Записи
               </NavLink>
+              <NavLink
+                to="/new-workshop-requests"
+                onClick={() => setMenuOpen(false)}
+                className={({ isActive }) =>
+                  `block rounded-lg px-3 py-2 text-sm ${isActive ? 'bg-amber-100 text-amber-900' : 'text-slate-600 hover:bg-slate-100'}`
+                }
+              >
+                Запись: Новый мастер-класс
+              </NavLink>
             </div>
           </div>
           <div>
@@ -70,6 +79,15 @@ export default function Layout() {
                 }
               >
                 Галерея работ
+              </NavLink>
+              <NavLink
+                to="/contacts"
+                onClick={() => setMenuOpen(false)}
+                className={({ isActive }) =>
+                  `block rounded-lg px-3 py-2 text-sm ${isActive ? 'bg-amber-100 text-amber-900' : 'text-slate-600 hover:bg-slate-100'}`
+                }
+              >
+                Контакты
               </NavLink>
             </div>
           </div>
