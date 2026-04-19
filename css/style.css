@@ -3108,3 +3108,104 @@ p {
     overflow-y: auto;
   }
 }
+
+/* ==========================================================================
+   Лоадер первой загрузки (ожидание изображений)
+   ========================================================================== */
+
+body.page-loading {
+  overflow: hidden;
+}
+
+.page-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--container-padding);
+  background: radial-gradient(
+      ellipse 120% 80% at 50% 20%,
+      rgba(242, 232, 221, 0.9) 0%,
+      var(--color-background) 55%
+    ),
+    var(--color-background);
+}
+
+.page-loader--hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity 0.55s cubic-bezier(0.4, 0, 0.2, 1),
+    visibility 0s linear 0.55s;
+}
+
+.page-loader__inner {
+  text-align: center;
+  max-width: 20rem;
+}
+
+.page-loader__rings {
+  position: relative;
+  width: 5rem;
+  height: 5rem;
+  margin: 0 auto 1.5rem;
+}
+
+.page-loader__ring {
+  position: absolute;
+  border-radius: var(--radius-full);
+  border: 2px solid transparent;
+  box-sizing: border-box;
+}
+
+.page-loader__ring--outer {
+  inset: 0;
+  border-top-color: var(--color-accent);
+  border-right-color: rgba(192, 138, 106, 0.35);
+  animation: page-loader-spin 1.35s cubic-bezier(0.45, 0.12, 0.55, 0.88) infinite;
+}
+
+.page-loader__ring--inner {
+  inset: 0.85rem;
+  border-bottom-color: var(--color-accent-light);
+  border-left-color: rgba(212, 168, 137, 0.35);
+  animation: page-loader-spin-reverse 1.05s cubic-bezier(0.45, 0.12, 0.55, 0.88) infinite;
+}
+
+@keyframes page-loader-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes page-loader-spin-reverse {
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
+.page-loader__brand {
+  font-family: var(--font-serif);
+  font-size: clamp(1.35rem, 3.5vw, 1.65rem);
+  font-weight: 500;
+  color: var(--color-text);
+  letter-spacing: 0.02em;
+  margin-bottom: 0.35rem;
+}
+
+.page-loader__hint {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-loader__ring--outer,
+  .page-loader__ring--inner {
+    animation-duration: 2.5s;
+    animation-timing-function: linear;
+  }
+}

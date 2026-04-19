@@ -29,7 +29,19 @@
   <!-- Favicon -->
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏺</text></svg>">
 </head>
-<body>
+<body class="page-loading">
+  <!-- Полноэкранный лоадер до загрузки изображений -->
+  <div id="pageLoader" class="page-loader" role="status" aria-live="polite" aria-busy="true" aria-label="Загрузка страницы">
+    <div class="page-loader__inner">
+      <div class="page-loader__rings" aria-hidden="true">
+        <span class="page-loader__ring page-loader__ring--outer"></span>
+        <span class="page-loader__ring page-loader__ring--inner"></span>
+      </div>
+      <p class="page-loader__brand">Твори Красиво</p>
+      <p class="page-loader__hint">Готовим студию…</p>
+    </div>
+  </div>
+
   <!-- ========== HEADER ========== -->
   <header class="header" id="header">
     <div class="container">
@@ -366,7 +378,7 @@
                 <select class="form-select" id="bookingMessenger" name="messenger" required>
                   <option value="">Выберите способ связи</option>
                   <option value="telegram">Telegram</option>
-                  <option value="whatsapp">WhatsApp</option>
+                  <option value="max">Мессенджер Max</option>
                   <option value="call">Позвонить</option>
                 </select>
                 <p class="form-error" id="messengerError" style="display: none;"></p>
@@ -445,7 +457,7 @@
             <select class="form-select" id="requestMessenger" required>
               <option value="">Выберите мессенджер</option>
               <option value="telegram">Telegram</option>
-              <option value="whatsapp">WhatsApp</option>
+              <option value="max">Мессенджер Max</option>
               <option value="phone">Телефонный звонок</option>
             </select>
           </div>
@@ -737,6 +749,6 @@
   </script>
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.5/main.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.5/locales/ru.min.js"></script>
-  <script src="js/main.js?v=4"></script>
+  <script src="js/main.js?v=9"></script>
 </body>
 </html>

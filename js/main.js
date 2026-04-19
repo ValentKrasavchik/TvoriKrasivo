@@ -89,6 +89,95 @@ function isSelectedSlotAvailable(cache, selectedSlot, durationMinutes) {
 // 2. УТИЛИТЫ
 // ==========================================================================
 
+/** Таймаут fetch, чтобы loadData() не зависала навсегда при недоступном API */
+function fetchWithTimeout(url, options, timeoutMs) {
+  timeoutMs = timeoutMs || 3000;
+  if (typeof AbortController === 'undefined') {
+    return Promise.race([
+      fetch(url, options || {}),
+      new Promise(function (_, rej) {
+        setTimeout(function () {
+          rej(new Error('fetch timeout'));
+        }, timeoutMs);
+      }),
+    ]);
+  }
+  var ctrl = new AbortController();
+  var id = setTimeout(function () {
+    try {
+      ctrl.abort();
+    } catch (_) {}
+  }, timeoutMs);
+  var opts = Object.assign({}, options || {});
+  opts.signal = ctrl.signal;
+  return fetch(url, opts).finally(function () {
+    clearTimeout(id);
+  });
+}
+
+var pageLoaderHidden = false;
+var pageLoaderFailsafeTimer = null;
+
+/**
+ * Дождаться загрузки всех изображений (без decode() — в части браузеров он не завершается).
+ * На каждое изображение — свой таймаут, чтобы один «зависший» URL не блокировал всё.
+ */
+function waitForAllImagesLoaded() {
+  document.querySelectorAll('img[loading="lazy"]').forEach(function (img) {
+    img.loading = 'eager';
+  });
+  var imgs = Array.prototype.slice.call(document.querySelectorAll('img'));
+  var perImageMs = 3000;
+  var tasks = imgs.map(function (img) {
+    var src = img.getAttribute('src');
+    if (!src || String(src).trim() === '') return Promise.resolve();
+    return Promise.race([
+      new Promise(function (resolve) {
+        if (img.complete && img.naturalWidth !== 0) {
+          resolve();
+          return;
+        }
+        if (img.complete && img.naturalWidth === 0) {
+          resolve();
+          return;
+        }
+        img.addEventListener('load', resolve, { once: true });
+        img.addEventListener('error', resolve, { once: true });
+      }),
+      new Promise(function (resolve) {
+        setTimeout(resolve, perImageMs);
+      }),
+    ]);
+  });
+  return Promise.all(tasks);
+}
+
+function hidePageLoader() {
+  if (pageLoaderHidden) return;
+  pageLoaderHidden = true;
+  if (pageLoaderFailsafeTimer) {
+    clearTimeout(pageLoaderFailsafeTimer);
+    pageLoaderFailsafeTimer = null;
+  }
+  var el = document.getElementById('pageLoader');
+  document.body.classList.remove('page-loading');
+  if (!el) return;
+  el.setAttribute('aria-busy', 'false');
+  el.classList.add('page-loader--hidden');
+  var done = false;
+  function cleanup() {
+    if (done) return;
+    done = true;
+    el.removeEventListener('transitionend', onEnd);
+    el.setAttribute('aria-hidden', 'true');
+  }
+  function onEnd(e) {
+    if (e.propertyName === 'opacity') cleanup();
+  }
+  el.addEventListener('transitionend', onEnd);
+  setTimeout(cleanup, 700);
+}
+
 /**
  * Форматирование даты в читаемый вид
  */
@@ -208,29 +297,50 @@ function mapWorkshopFromApi(w) {
 
 async function loadData() {
   let workshops = [];
+  let reviews = [];
+  let gallery = [];
+  let faq = [];
+  let contacts = {};
+
+  var responses = await Promise.all([
+    fetchWithTimeout(`${API_BASE}/api/public/workshops`).catch(function () {
+      return null;
+    }),
+    fetchWithTimeout(`${API_BASE}/api/public/reviews`).catch(function () {
+      return null;
+    }),
+    fetchWithTimeout(`${API_BASE}/api/public/gallery`).catch(function () {
+      return null;
+    }),
+    fetchWithTimeout(`${API_BASE}/api/public/contacts`, { cache: 'no-store' }).catch(function () {
+      return null;
+    }),
+    fetchWithTimeout('data/workshops.json').catch(function () {
+      return null;
+    }),
+  ]);
+
+  var apiRes = responses[0];
+  var revRes = responses[1];
+  var galRes = responses[2];
+  var cRes = responses[3];
+  var legacyRes = responses[4];
+
   try {
-    const apiRes = await fetch(`${API_BASE}/api/public/workshops`);
-    if (apiRes.ok) {
+    if (apiRes && apiRes.ok) {
       const list = await apiRes.json();
       workshops = (Array.isArray(list) ? list : []).map(mapWorkshopFromApi);
     }
   } catch (_) {}
 
-  let reviews = [];
-  let gallery = [];
-  let faq = [];
-  let contacts = {};
   try {
-    const revRes = await fetch(`${API_BASE}/api/public/reviews`);
-    if (revRes.ok) reviews = await revRes.json();
+    if (revRes && revRes.ok) reviews = await revRes.json();
   } catch (_) {}
   try {
-    const galRes = await fetch(`${API_BASE}/api/public/gallery`);
-    if (galRes.ok) gallery = await galRes.json();
+    if (galRes && galRes.ok) gallery = await galRes.json();
   } catch (_) {}
   try {
-    const cRes = await fetch(`${API_BASE}/api/public/contacts`, { cache: 'no-store' });
-    if (cRes.ok) {
+    if (cRes && cRes.ok) {
       const cData = await cRes.json();
       if (cData.blocks && cData.blocks.length) {
         contacts = cData;
@@ -239,9 +349,8 @@ async function loadData() {
   } catch (_) {}
 
   try {
-    const response = await fetch('data/workshops.json');
-    if (response.ok) {
-      const data = await response.json();
+    if (legacyRes && legacyRes.ok) {
+      const data = await legacyRes.json();
       faq = data.faq || [];
       if (!contacts.blocks || !contacts.blocks.length) {
         contacts = legacyContactsToBlocks(data.contacts || {});
@@ -406,6 +515,8 @@ var scheduleModalState = {
   /** Дата, подсвеченная при скролле (без фильтра и чипа); чип только при клике по календарю */
   highlightedDate: null,
   view: 'week', // 'week' | 'month'
+  /** Пока идёт fetch слотов в openScheduleModal — иначе пустой список выглядит как «вечная загрузка» */
+  slotsLoading: false,
   slotsWithWorkshop: [],
   detailWorkshop: null,
   detailSlot: null,
@@ -777,10 +888,20 @@ function renderScheduleSlotList() {
   }
 
   var noSlotsAfterFilters = allList.length > 0 && !list.length;
+  var workshopCount = (workshopsData && workshopsData.workshops) ? workshopsData.workshops.length : 0;
   if (hintEl) {
-    if (!allList.length) {
+    if (scheduleModalState.slotsLoading) {
       hintEl.style.display = 'block';
-      hintEl.textContent = 'Загрузка…';
+      hintEl.textContent = 'Загрузка слотов…';
+    } else if (!allList.length) {
+      hintEl.style.display = 'block';
+      if (workshopCount === 0) {
+        hintEl.textContent = 'Нет доступных мастер-классов';
+      } else {
+        hintEl.innerHTML =
+          '<p class="schedule-modal__list-hint-text">Пока нет открытых слотов на выбранный период</p>' +
+          '<button type="button" class="schedule-request-btn" id="scheduleRequestBtn">Хочу мастер-класс</button>';
+      }
     } else if (noSlotsForSelectedDate || noSlotsAfterFilters) {
       hintEl.style.display = 'block';
       hintEl.innerHTML =
@@ -1102,6 +1223,7 @@ function closeScheduleModal() {
   }
   stopScheduleCarouselAutoScroll();
   document.body.style.overflow = '';
+  scheduleModalState.slotsLoading = false;
   hideScheduleDetailScreen();
 }
 
@@ -1109,10 +1231,6 @@ function openScheduleModal() {
   var overlay = document.getElementById('scheduleModalOverlay');
   if (!overlay) return;
   var workshops = workshopsData && workshopsData.workshops ? workshopsData.workshops : [];
-  if (!workshops.length) {
-    var hint = document.getElementById('scheduleListHint');
-    if (hint) hint.textContent = 'Нет доступных мастер-классов';
-  }
   var now = new Date();
   scheduleModalState.year = now.getFullYear();
   scheduleModalState.month = now.getMonth();
@@ -1144,8 +1262,18 @@ function openScheduleModal() {
   // Блокируем прокрутку страницы: скролл только внутри модалки
   document.body.style.overflow = 'hidden';
   renderScheduleCalendar();
+
+  if (!workshops.length) {
+    scheduleModalState.slotsLoading = false;
+    scheduleModalState.slotsWithWorkshop = [];
+    applyScheduleFiltersAndRefresh(false);
+    return;
+  }
+
+  scheduleModalState.slotsLoading = true;
   var hintEl = document.getElementById('scheduleListHint');
   if (hintEl) hintEl.textContent = 'Загрузка слотов…';
+  applyScheduleFiltersAndRefresh(false);
 
   var range = getDateRange(0, 60);
   var dateFrom = range.dateFrom;
@@ -1154,26 +1282,33 @@ function openScheduleModal() {
     var url = API_BASE + '/api/public/slots?workshopId=' + encodeURIComponent(w.id) + '&dateFrom=' + encodeURIComponent(dateFrom) + '&dateTo=' + encodeURIComponent(dateTo);
     return fetch(url, { cache: 'no-store' }).then(function (res) { return res.ok ? res.json() : []; }).catch(function () { return []; });
   });
-  Promise.all(promises).then(function (results) {
-    var list = [];
-    results.forEach(function (slots, idx) {
-      var workshop = workshops[idx];
-      if (!workshop || !Array.isArray(slots)) return;
-      slots.forEach(function (slot) {
-        list.push({ workshop: workshop, slot: slot });
+  Promise.all(promises)
+    .then(function (results) {
+      scheduleModalState.slotsLoading = false;
+      var list = [];
+      results.forEach(function (slots, idx) {
+        var workshop = workshops[idx];
+        if (!workshop || !Array.isArray(slots)) return;
+        slots.forEach(function (slot) {
+          list.push({ workshop: workshop, slot: slot });
+        });
       });
+      list.sort(function (a, b) {
+        var d1 = (a.slot && a.slot.date) ? a.slot.date : '';
+        var t1 = (a.slot && a.slot.time) ? (a.slot.time || '') : '';
+        var d2 = (b.slot && b.slot.date) ? b.slot.date : '';
+        var t2 = (b.slot && b.slot.time) ? (b.slot.time || '') : '';
+        if (d1 !== d2) return d1.localeCompare(d2);
+        return t1.localeCompare(t2);
+      });
+      scheduleModalState.slotsWithWorkshop = list;
+      applyScheduleFiltersAndRefresh(false);
+    })
+    .catch(function () {
+      scheduleModalState.slotsLoading = false;
+      scheduleModalState.slotsWithWorkshop = [];
+      applyScheduleFiltersAndRefresh(false);
     });
-    list.sort(function (a, b) {
-      var d1 = (a.slot && a.slot.date) ? a.slot.date : '';
-      var t1 = (a.slot && a.slot.time) ? (a.slot.time || '') : '';
-      var d2 = (b.slot && b.slot.date) ? b.slot.date : '';
-      var t2 = (b.slot && b.slot.time) ? (b.slot.time || '') : '';
-      if (d1 !== d2) return d1.localeCompare(d2);
-      return t1.localeCompare(t2);
-    });
-    scheduleModalState.slotsWithWorkshop = list;
-    applyScheduleFiltersAndRefresh(false);
-  });
 }
 
 function openScheduleFilterModal(modalId) {
@@ -3059,26 +3194,43 @@ function initSuccessModal() {
 // ==========================================================================
 
 async function init() {
-  // Загружаем данные
-  const data = await loadData();
-  
-  // Инициализируем компоненты
-  initNavigation();
-  initBookingModal();
-  initScheduleModal();
-  initSuccessModal();
-  initPrivacyModal();
-  initSlotsOverviewModal();
+  try {
+    // Загружаем данные
+    const data = await loadData();
 
-  // Рендерим контент (галерея рендерится из API, затем вешаем lightbox)
-  if (data.workshops) renderWorkshops(data.workshops);
-  if (data.reviews) renderReviews(data.reviews);
-  if (data.gallery) renderGallery(data.gallery);
-  if (data.faq) renderFAQ(data.faq);
-  if (data.contacts) renderContacts(data.contacts);
-  initGallery();
-  initYandexMap();
+    // Инициализируем компоненты
+    initNavigation();
+    initBookingModal();
+    initScheduleModal();
+    initSuccessModal();
+    initPrivacyModal();
+    initSlotsOverviewModal();
+
+    // Рендерим контент (галерея рендерится из API, затем вешаем lightbox)
+    if (data.workshops) renderWorkshops(data.workshops);
+    if (data.reviews) renderReviews(data.reviews);
+    if (data.gallery) renderGallery(data.gallery);
+    if (data.faq) renderFAQ(data.faq);
+    if (data.contacts) renderContacts(data.contacts);
+    initGallery();
+    initYandexMap();
+  } catch (e) {
+    console.warn('init:', e);
+  }
+
+  try {
+    await Promise.race([
+      waitForAllImagesLoaded(),
+      new Promise(function (r) {
+        setTimeout(r, 3000);
+      }),
+    ]);
+  } catch (_e) {}
+  hidePageLoader();
 }
 
-// Запускаем при загрузке DOM
-document.addEventListener('DOMContentLoaded', init);
+// Запускаем при загрузке DOM; запасной таймер — лоадер не остаётся навсегда при любой ошибке
+document.addEventListener('DOMContentLoaded', function () {
+  pageLoaderFailsafeTimer = setTimeout(hidePageLoader, 3000);
+  init();
+});

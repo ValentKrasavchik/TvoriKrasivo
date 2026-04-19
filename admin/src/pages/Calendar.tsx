@@ -7,6 +7,9 @@ import interactionPlugin from '@fullcalendar/interaction';
 import ruLocale from '@fullcalendar/core/locales/ru';
 import { fetchSlots, createSlot, updateSlot, deleteSlot, fetchWorkshops } from '../lib/api';
 
+/** Значение селекта «показать слоты всех мастер-классов» (не является id в БД). */
+const ALL_WORKSHOPS = '__all__';
+
 type Slot = {
   id: string;
   workshopId: string;
@@ -19,11 +22,26 @@ type Slot = {
   bookedSeats?: number;
   heldSeats?: number;
   status: string;
-  workshop?: { id?: string; durationMinutes?: number };
+  workshop?: { id?: string; title?: string; durationMinutes?: number };
 };
+
+type WorkshopOption = { id: string; label: string; durationMinutes: number };
 
 function slotWorkshopId(s: Slot): string {
   return (s.workshopId || s.workshop?.id || '').trim();
+}
+
+function effectiveWorkshopIdForActions(selected: string, workshops: WorkshopOption[]): string {
+  if (selected === ALL_WORKSHOPS) return workshops[0]?.id ?? '';
+  return selected;
+}
+
+/** Календарная дата в локальном часовом поясе (не UTC — иначе «воскресенье» съедается при dateTo). */
+function formatLocalYMD(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 function getInitialWeek() {
@@ -32,13 +50,11 @@ function getInitialWeek() {
   const diff = d.getDate() - day + (day === 0 ? -6 : 1);
   const mon = new Date(d);
   mon.setDate(diff);
-  const from = mon.toISOString().slice(0, 10);
+  const from = formatLocalYMD(mon);
   const sun = new Date(mon);
   sun.setDate(sun.getDate() + 6);
-  return { dateFrom: from, dateTo: sun.toISOString().slice(0, 10) };
+  return { dateFrom: from, dateTo: formatLocalYMD(sun) };
 }
-
-type WorkshopOption = { id: string; label: string; durationMinutes: number };
 
 function toDateTimeLocalValue(date: string, time: string) {
   if (!date) return '';
@@ -55,16 +71,28 @@ function fromDateTimeLocalValue(value: string) {
   };
 }
 
+/** Время слота в формате HH:MM (из БД иногда приходит «12:00:00» — иначе ISO становится невалидным). */
+function slotTimeHM(time: unknown): string {
+  const parts = String(time ?? '12:00').trim().split(':');
+  const h = parseInt(parts[0] || '12', 10);
+  const m = parseInt(parts[1] || '0', 10);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return '12:00';
+  return `${String(Math.min(23, Math.max(0, h))).padStart(2, '0')}:${String(Math.min(59, Math.max(0, m))).padStart(2, '0')}`;
+}
+
 function slotToEvent(s: Slot) {
   const free = s.freeSeats ?? s.capacity ?? 0;
   const cap = s.capacityTotal ?? s.capacity ?? 0;
-  const start = new Date(`${s.date}T${s.time}:00`);
+  const hm = slotTimeHM(s.time);
+  const wTitle = (s.workshop?.title || '').trim();
+  const start = new Date(`${s.date}T${hm}:00`);
   const end = new Date(start);
   const duration = s.durationMinutes ?? s.workshop?.durationMinutes ?? 120;
   end.setMinutes(end.getMinutes() + duration);
+  const labelPrefix = wTitle ? `${wTitle} · ` : '';
   return {
     id: s.id,
-    title: `${s.time} — ${s.status} — Своб: ${free}/${cap}`,
+    title: `${labelPrefix}${hm} — ${s.status} — Своб: ${free}/${cap}`,
     start,
     end,
     extendedProps: { slot: s },
@@ -127,6 +155,7 @@ export default function Calendar() {
   const [creating, setCreating] = useState(false);
 
   const getWorkshopDuration = (id: string) => {
+    if (id === ALL_WORKSHOPS) return workshops[0]?.durationMinutes ?? 120;
     const w = workshops.find((item) => item.id === id);
     return w?.durationMinutes ?? 120;
   };
@@ -134,6 +163,11 @@ export default function Calendar() {
   const refetchEvents = () => {
     calendarRef.current?.getApi()?.refetchEvents();
   };
+
+  /** Первый запрос слотов часто уходит с пустым workshopId; после выбора МК FullCalendar сам не всегда перезапрашивает. */
+  useEffect(() => {
+    if (workshopId) refetchEvents();
+  }, [workshopId]);
 
   useEffect(() => {
     const intervalId = setInterval(() => {
@@ -148,9 +182,10 @@ export default function Calendar() {
     if (arg.dateStr.includes('T') && arg.date) {
       time = `${String(arg.date.getHours()).padStart(2, '0')}:${String(arg.date.getMinutes()).padStart(2, '0')}`;
     }
+    const widForForm = effectiveWorkshopIdForActions(workshopId, workshops);
     const duration = getWorkshopDuration(workshopId);
-    modalWorkshopIdRef.current = workshopId;
-    setForm({ workshopId, date: dateStr, time, capacity: 6, freeze: false, durationMinutes: duration });
+    modalWorkshopIdRef.current = widForForm;
+    setForm({ workshopId: widForForm, date: dateStr, time, capacity: 6, freeze: false, durationMinutes: duration });
     setDateTimeLocal(toDateTimeLocalValue(dateStr, time));
     setModal({ type: 'create', date: dateStr });
     setCreateScope('single');
@@ -163,9 +198,10 @@ export default function Calendar() {
     const base = api?.getDate() ?? new Date();
     const dateStr = `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, '0')}-${String(base.getDate()).padStart(2, '0')}`;
     const time = '12:00';
+    const widForForm = effectiveWorkshopIdForActions(workshopId, workshops);
     const duration = getWorkshopDuration(workshopId);
-    modalWorkshopIdRef.current = workshopId;
-    setForm({ workshopId, date: dateStr, time, capacity: 6, freeze: false, durationMinutes: duration });
+    modalWorkshopIdRef.current = widForForm;
+    setForm({ workshopId: widForForm, date: dateStr, time, capacity: 6, freeze: false, durationMinutes: duration });
     setDateTimeLocal(toDateTimeLocalValue(dateStr, time));
     setModal({ type: 'create', date: dateStr });
     setCreateScope('single');
@@ -186,8 +222,9 @@ export default function Calendar() {
       ? '00:00'
       : `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`;
     const diffMinutes = Math.max(1, Math.round((selectInfo.end.getTime() - selectInfo.start.getTime()) / 60000));
-    modalWorkshopIdRef.current = workshopId;
-    setForm({ workshopId, date: dateStr, time, capacity: 6, freeze: true, durationMinutes: diffMinutes });
+    const widForForm = effectiveWorkshopIdForActions(workshopId, workshops);
+    modalWorkshopIdRef.current = widForForm;
+    setForm({ workshopId: widForForm, date: dateStr, time, capacity: 6, freeze: true, durationMinutes: diffMinutes });
     setDateTimeLocal(toDateTimeLocalValue(dateStr, time));
 
     let createDateRange: { dateFrom: string; dateTo: string } | undefined;
@@ -196,7 +233,7 @@ export default function Calendar() {
       const endExclusive = selectInfo.endStr.slice(0, 10);
       const endDate = new Date(endExclusive + 'T12:00:00');
       endDate.setDate(endDate.getDate() - 1);
-      const dateTo = endDate.toISOString().slice(0, 10);
+      const dateTo = formatLocalYMD(endDate);
       if (dateTo >= dateFrom && dateFrom !== dateTo) {
         createDateRange = { dateFrom, dateTo };
       }
@@ -228,7 +265,7 @@ export default function Calendar() {
     const from = new Date(dateFrom + 'T12:00:00');
     const to = new Date(dateTo + 'T12:00:00');
     for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
-      out.push(d.toISOString().slice(0, 10));
+      out.push(formatLocalYMD(d));
     }
     return out;
   }
@@ -255,7 +292,6 @@ export default function Calendar() {
         capacity: form.capacity,
       };
       const range = modal?.createDateRange;
-      const api = calendarRef.current?.getApi();
       const scope = createScope;
 
       if (scope === 'week' || scope === 'month') {
@@ -271,7 +307,7 @@ export default function Calendar() {
         for (let i = 0; i < days; i++) {
           const d = new Date(startDate);
           d.setDate(startDate.getDate() + i);
-          const dateStr = d.toISOString().slice(0, 10);
+          const dateStr = formatLocalYMD(d);
           setCreateProgress(`${i + 1} / ${days}`);
           await createSlot({
             workshopId: wid,
@@ -294,7 +330,7 @@ export default function Calendar() {
         if (dates.length > 0) {
           const duration = getWorkshopDuration(wid);
           for (const date of dates) {
-            const created = await createSlot({
+            await createSlot({
               workshopId: wid,
               date,
               time: '00:00',
@@ -302,15 +338,12 @@ export default function Calendar() {
               freeze: true,
               durationMinutes: Math.max(1, payload.durationMinutes || duration),
             });
-            if (api && created) api.addEvent(slotToEvent(created as Slot));
           }
         } else {
-          const created = await createSlot(payload);
-          if (api && created) api.addEvent(slotToEvent(created as Slot));
+          await createSlot(payload);
         }
       } else {
-        const created = await createSlot(payload);
-        if (api && created) api.addEvent(slotToEvent(created as Slot));
+        await createSlot(payload);
       }
       setModal(null);
       refetchEvents();
@@ -378,7 +411,9 @@ export default function Calendar() {
     const dateTo = `${year}-${String(month + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
     setOverviewMonthYear({ year, month });
     try {
-      const slots = await fetchSlots({ workshopId: wid, dateFrom, dateTo });
+      const slots = await fetchSlots(
+        wid === ALL_WORKSHOPS ? { dateFrom, dateTo } : { workshopId: wid, dateFrom, dateTo }
+      );
       const byDay: Record<string, number> = {};
       for (const s of slots as Slot[]) {
         const free = s.freeSeats ?? 0;
@@ -428,14 +463,21 @@ export default function Calendar() {
             setWorkshopId(e.target.value);
             setTimeout(refetchEvents, 0);
           }}
-          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm sm:w-auto"
+          disabled={!workshops.length}
+          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm sm:w-auto disabled:opacity-60"
         >
-          <option value="">{workshops.length ? 'Мастер-класс' : 'Загрузка...'}</option>
-          {workshops.map((w) => (
-            <option key={w.id} value={w.id}>
-              {w.label}
-            </option>
-          ))}
+          {!workshops.length ? (
+            <option value="">Загрузка...</option>
+          ) : (
+            <>
+              <option value={ALL_WORKSHOPS}>Все мастерклассы</option>
+              {workshops.map((w) => (
+                <option key={w.id} value={w.id}>
+                  {w.label}
+                </option>
+              ))}
+            </>
+          )}
         </select>
         <span className="text-xs text-slate-500 sm:text-sm">
           Период: {dateFrom} … {dateTo} (неделя/месяц — переключайте в календаре)
@@ -455,14 +497,18 @@ export default function Calendar() {
               successCallback([]);
               return;
             }
-            const dateFromStr = fetchInfo.startStr.slice(0, 10);
+            const dateFromStr = formatLocalYMD(fetchInfo.start);
             const endDate = new Date(fetchInfo.end);
             endDate.setDate(endDate.getDate() - 1);
-            const dateToStr = endDate.toISOString().slice(0, 10);
+            const dateToStr = formatLocalYMD(endDate);
             setDateFrom(dateFromStr);
             setDateTo(dateToStr);
             try {
-              const data = await fetchSlots({ workshopId: wid, dateFrom: dateFromStr, dateTo: dateToStr });
+              const slotParams =
+                wid === ALL_WORKSHOPS
+                  ? { dateFrom: dateFromStr, dateTo: dateToStr }
+                  : { workshopId: wid, dateFrom: dateFromStr, dateTo: dateToStr };
+              const data = await fetchSlots(slotParams);
               successCallback(slotsToEvents(data));
             } catch {
               successCallback([]);
@@ -525,7 +571,7 @@ export default function Calendar() {
                   value={
                     modal.type === 'edit' && modal.slot
                       ? form.workshopId || slotWorkshopId(modal.slot)
-                      : form.workshopId || workshopId
+                      : form.workshopId || effectiveWorkshopIdForActions(workshopId, workshops)
                   }
                   onChange={(e) => {
                     const nextId = e.target.value;
