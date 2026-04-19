@@ -108,7 +108,7 @@ function slotsToEvents(slots: Slot[]) {
 export default function Calendar() {
   const initialWeek = getInitialWeek();
   const [workshops, setWorkshops] = useState<WorkshopOption[]>([]);
-  const [workshopId, setWorkshopId] = useState('');
+  const [workshopId, setWorkshopId] = useState(ALL_WORKSHOPS);
   const [dateFrom, setDateFrom] = useState(initialWeek.dateFrom);
   const [dateTo, setDateTo] = useState(initialWeek.dateTo);
   const [modal, setModal] = useState<{
@@ -143,13 +143,13 @@ export default function Calendar() {
             durationMinutes: w.durationMinutes ?? 120,
           }))
         );
-        if (list.length) setWorkshopId((prev) => prev || list[0].id);
+        if (list.length) setWorkshopId((prev) => prev || ALL_WORKSHOPS);
       })
       .catch(() => setWorkshops([]));
   }, []);
 
   useEffect(() => {
-    if (workshops.length && !workshopId) setWorkshopId(workshops[0].id);
+    if (workshops.length && !workshopId) setWorkshopId(ALL_WORKSHOPS);
   }, [workshops, workshopId]);
   const [error, setError] = useState('');
   const [creating, setCreating] = useState(false);

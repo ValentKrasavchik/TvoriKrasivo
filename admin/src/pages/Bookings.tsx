@@ -41,7 +41,6 @@ export default function Bookings() {
   const [workshopId, setWorkshopId] = useState('');
   const [status, setStatus] = useState('');
   const [loading, setLoading] = useState(true);
-  const [detail, setDetail] = useState<Booking | null>(null);
   const [error, setError] = useState('');
 
   async function load() {
@@ -72,7 +71,6 @@ export default function Bookings() {
     try {
       await confirmBooking(id);
       load();
-      if (detail?.id === id) setDetail(null);
     } catch (e: any) {
       setError(e.message || 'Ошибка');
     }
@@ -83,7 +81,6 @@ export default function Bookings() {
     try {
       await approveBooking(id);
       load();
-      if (detail?.id === id) setDetail(null);
     } catch (e: any) {
       setError(e.message || 'Ошибка');
     }
@@ -95,7 +92,6 @@ export default function Bookings() {
     try {
       await rejectBooking(id);
       load();
-      if (detail?.id === id) setDetail(null);
     } catch (e: any) {
       setError(e.message || 'Ошибка');
     }
@@ -107,7 +103,6 @@ export default function Bookings() {
     try {
       await cancelBooking(id);
       load();
-      if (detail?.id === id) setDetail(null);
     } catch (e: any) {
       setError(e.message || 'Ошибка');
     }
@@ -119,7 +114,6 @@ export default function Bookings() {
     try {
       await deleteBooking(id);
       load();
-      if (detail?.id === id) setDetail(null);
     } catch (e: any) {
       setError(e.message || 'Ошибка');
     }
@@ -167,7 +161,7 @@ export default function Bookings() {
         </select>
       </div>
       {error && <p className="mb-2 text-sm text-red-600">{error}</p>}
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
         {loading ? (
           <p className="p-4">Загрузка...</p>
         ) : (
@@ -183,33 +177,25 @@ export default function Bookings() {
                 className="rounded-lg border border-slate-200 bg-slate-50 p-4"
               >
                 <div className="mb-2 flex items-start justify-between gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setDetail(b)}
-                    className="font-medium text-amber-700 hover:underline"
-                  >
-                    {b.name}
-                  </button>
+                  <span className="font-medium text-slate-800">{b.name}</span>
                   <span className="shrink-0 rounded bg-slate-200 px-2 py-0.5 text-xs text-slate-700">
                     {STATUS_LABEL[b.status] || b.status}
                   </span>
                 </div>
-                <p className="flex items-center gap-2 text-sm text-slate-600">
-                  <button
-                    type="button"
-                    onClick={() => setDetail(b)}
-                    className="shrink-0 rounded p-1 text-slate-500 hover:bg-slate-200 hover:text-slate-700"
-                    title="Открыть детали записи"
-                    aria-label="Открыть детали записи"
-                  >
-                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                  </button>
-                  <span>{b.slot.date} {b.slot.time} — {WORKSHOPS[b.slot.workshopId] || b.slot.workshopId}</span>
+                <p className="text-sm text-slate-600">
+                  {b.slot.date} {b.slot.time} — {WORKSHOPS[b.slot.workshopId] || b.slot.workshopId}
                 </p>
                 <p className="text-sm text-slate-500">{b.phone}</p>
+                <p className="text-sm text-slate-600">
+                  <span className="text-slate-500">Связь:</span> {b.messenger}
+                </p>
+                <p className="text-sm text-slate-600">
+                  <span className="text-slate-500">Участников:</span> {b.participants}
+                </p>
+                <p className="text-sm text-slate-600">
+                  <span className="text-slate-500">Комментарий:</span>{' '}
+                  {b.comment?.trim() ? b.comment : '—'}
+                </p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {b.status === 'PENDING_ADMIN' && (
                     <>
@@ -234,14 +220,16 @@ export default function Bookings() {
           </div>
 
           {/* Таблица для десктопа */}
-          <table className="hidden w-full text-sm md:table">
+          <table className="hidden min-w-[56rem] w-full text-sm md:table">
             <thead className="bg-slate-50">
               <tr>
-                <th className="w-10 border-b border-slate-200 px-2 py-3 text-left font-medium" aria-label="Просмотр" />
                 <th className="border-b border-slate-200 px-4 py-3 text-left font-medium">Дата / время</th>
                 <th className="border-b border-slate-200 px-4 py-3 text-left font-medium">Мастер-класс</th>
                 <th className="border-b border-slate-200 px-4 py-3 text-left font-medium">Имя</th>
                 <th className="border-b border-slate-200 px-4 py-3 text-left font-medium">Телефон</th>
+                <th className="border-b border-slate-200 px-4 py-3 text-left font-medium">Связь</th>
+                <th className="border-b border-slate-200 px-4 py-3 text-left font-medium">Участников</th>
+                <th className="min-w-[10rem] border-b border-slate-200 px-4 py-3 text-left font-medium">Комментарий</th>
                 <th className="border-b border-slate-200 px-4 py-3 text-left font-medium">Статус</th>
                 <th className="border-b border-slate-200 px-4 py-3 text-left font-medium">Действия</th>
               </tr>
@@ -249,34 +237,17 @@ export default function Bookings() {
             <tbody>
               {bookings.map((b) => (
                 <tr key={b.id} className="border-b border-slate-100 hover:bg-slate-50">
-                  <td className="w-10 px-2 py-3">
-                    <button
-                      type="button"
-                      onClick={() => setDetail(b)}
-                      className="rounded p-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-700"
-                      title="Открыть детали записи"
-                      aria-label="Открыть детали записи"
-                    >
-                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                    </button>
-                  </td>
-                  <td className="px-4 py-3">
+                  <td className="whitespace-nowrap px-4 py-3">
                     {b.slot.date} {b.slot.time}
                   </td>
                   <td className="px-4 py-3">{WORKSHOPS[b.slot.workshopId] || b.slot.workshopId}</td>
-                  <td className="px-4 py-3">
-                    <button
-                      type="button"
-                      onClick={() => setDetail(b)}
-                      className="text-amber-700 hover:underline"
-                    >
-                      {b.name}
-                    </button>
+                  <td className="px-4 py-3 font-medium text-slate-800">{b.name}</td>
+                  <td className="whitespace-nowrap px-4 py-3">{b.phone}</td>
+                  <td className="px-4 py-3">{b.messenger}</td>
+                  <td className="whitespace-nowrap px-4 py-3">{b.participants}</td>
+                  <td className="max-w-[14rem] break-words px-4 py-3 text-slate-600">
+                    {b.comment?.trim() ? b.comment : '—'}
                   </td>
-                  <td className="px-4 py-3">{b.phone}</td>
                   <td className="px-4 py-3">{STATUS_LABEL[b.status] || b.status}</td>
                   <td className="px-4 py-3">
                     {b.status === 'PENDING_ADMIN' && (
@@ -343,55 +314,6 @@ export default function Bookings() {
           <p className="hidden p-4 text-slate-500 md:block">Нет записей по выбранным фильтрам.</p>
         )}
       </div>
-
-      {detail && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-          onClick={() => setDetail(null)}
-        >
-          <div
-            className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-xl bg-white p-4 shadow-xl sm:p-6"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="mb-3 font-semibold">Детали записи</h3>
-            <dl className="space-y-2 text-sm">
-              <div>
-                <dt className="text-slate-500">Имя</dt>
-                <dd>{detail.name}</dd>
-              </div>
-              <div>
-                <dt className="text-slate-500">Телефон</dt>
-                <dd>{detail.phone}</dd>
-              </div>
-              <div>
-                <dt className="text-slate-500">Способ связи</dt>
-                <dd>{detail.messenger}</dd>
-              </div>
-              <div>
-                <dt className="text-slate-500">Участников</dt>
-                <dd>{detail.participants}</dd>
-              </div>
-              <div>
-                <dt className="text-slate-500">Комментарий</dt>
-                <dd>{detail.comment?.trim() ? detail.comment : '—'}</dd>
-              </div>
-              <div>
-                <dt className="text-slate-500">Слот</dt>
-                <dd>
-                  {detail.slot.date} {detail.slot.time} — {WORKSHOPS[detail.slot.workshopId]}
-                </dd>
-              </div>
-            </dl>
-            <button
-              type="button"
-              onClick={() => setDetail(null)}
-              className="mt-4 rounded-lg border px-4 py-2 text-sm"
-            >
-              Закрыть
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

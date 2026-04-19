@@ -460,20 +460,19 @@ adminRouter.post('/slots/:id/unhold', async (req: Request, res: Response) => {
 
 adminRouter.delete('/slots/:id', async (req: Request, res: Response) => {
   try {
-    // Delete in transaction: first delete related bookings and seat holds, then the slot
+    // Delete in transaction: заявки «Новый мастер-класс», подтверждённые этим слотом, затем брони/холды, слот
     await prisma.$transaction(async (tx) => {
       const { id } = req.params;
-      
-      // Delete all bookings for this slot
+
+      await tx.workshopRequest.deleteMany({ where: { confirmedSlotId: id } });
+
       await tx.booking.deleteMany({ where: { slotId: id } });
-      
-      // Delete all seat holds for this slot
+
       await tx.seatHold.deleteMany({ where: { slotId: id } });
-      
-      // Now delete the slot itself
+
       await tx.slot.delete({ where: { id } });
     });
-    
+
     res.status(204).send();
   } catch (e) {
     console.error('DELETE /api/admin/slots/:id', e);
@@ -718,9 +717,25 @@ adminRouter.patch('/workshop-requests/:id', async (req: Request, res: Response) 
 
 adminRouter.delete('/workshop-requests/:id', async (req: Request, res: Response) => {
   try {
-    await prisma.workshopRequest.delete({ where: { id: req.params.id } });
+    await prisma.$transaction(async (tx) => {
+      const existing = await tx.workshopRequest.findUnique({
+        where: { id: req.params.id },
+        select: { id: true, confirmedSlotId: true },
+      });
+      if (!existing) throw new Error('NOT_FOUND');
+
+      if (existing.confirmedSlotId) {
+        const sid = existing.confirmedSlotId;
+        await tx.booking.deleteMany({ where: { slotId: sid } });
+        await tx.seatHold.deleteMany({ where: { slotId: sid } });
+        await tx.slot.delete({ where: { id: sid } });
+      }
+
+      await tx.workshopRequest.delete({ where: { id: req.params.id } });
+    });
     res.status(204).send();
   } catch (e: any) {
+    if (e?.message === 'NOT_FOUND') return res.status(404).json({ error: 'Request not found' });
     if (e?.code === 'P2025') return res.status(404).json({ error: 'Request not found' });
     console.error('DELETE /api/admin/workshop-requests/:id', e);
     res.status(500).json({ error: 'Internal server error' });
