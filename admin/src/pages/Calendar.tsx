@@ -16,6 +16,11 @@ type Slot = {
   date: string;
   time: string;
   capacity: number;
+  /** Места, занятые вне онлайн-записи (офлайн) — учитываются в свободных местах */
+  offlineOccupiedSeats?: number;
+  /** Если задано — для сайта вместо суммы броней (см. backend) */
+  manualOccupiedSeats?: number | null;
+  nonHoldOccupiedSeats?: number;
   durationMinutes?: number | null;
   capacityTotal?: number;
   freeSeats?: number;
@@ -120,7 +125,16 @@ export default function Calendar() {
     time?: string;
     createDateRange?: { dateFrom: string; dateTo: string };
   } | null>(null);
-  const [form, setForm] = useState({ workshopId: '', date: '', time: '12:00', capacity: 6, freeze: false, durationMinutes: 120 });
+  const [form, setForm] = useState({
+    workshopId: '',
+    date: '',
+    time: '12:00',
+    capacity: 6,
+    /** Занято мест для расчёта «осталось» на сайте (поле manualOccupiedSeats в API) */
+    manualOccupiedSeats: 0,
+    freeze: false,
+    durationMinutes: 120,
+  });
   const [slotsOverviewOpen, setSlotsOverviewOpen] = useState(false);
   const [overviewCountByDay, setOverviewCountByDay] = useState<Record<string, number>>({});
   const [overviewMonthYear, setOverviewMonthYear] = useState<{ year: number; month: number } | null>(null);
@@ -185,7 +199,15 @@ export default function Calendar() {
     const widForForm = effectiveWorkshopIdForActions(workshopId, workshops);
     const duration = getWorkshopDuration(workshopId);
     modalWorkshopIdRef.current = widForForm;
-    setForm({ workshopId: widForForm, date: dateStr, time, capacity: 6, freeze: false, durationMinutes: duration });
+    setForm({
+      workshopId: widForForm,
+      date: dateStr,
+      time,
+      capacity: 6,
+      manualOccupiedSeats: 0,
+      freeze: false,
+      durationMinutes: duration,
+    });
     setDateTimeLocal(toDateTimeLocalValue(dateStr, time));
     setModal({ type: 'create', date: dateStr });
     setCreateScope('single');
@@ -201,7 +223,15 @@ export default function Calendar() {
     const widForForm = effectiveWorkshopIdForActions(workshopId, workshops);
     const duration = getWorkshopDuration(workshopId);
     modalWorkshopIdRef.current = widForForm;
-    setForm({ workshopId: widForForm, date: dateStr, time, capacity: 6, freeze: false, durationMinutes: duration });
+    setForm({
+      workshopId: widForForm,
+      date: dateStr,
+      time,
+      capacity: 6,
+      manualOccupiedSeats: 0,
+      freeze: false,
+      durationMinutes: duration,
+    });
     setDateTimeLocal(toDateTimeLocalValue(dateStr, time));
     setModal({ type: 'create', date: dateStr });
     setCreateScope('single');
@@ -224,7 +254,15 @@ export default function Calendar() {
     const diffMinutes = Math.max(1, Math.round((selectInfo.end.getTime() - selectInfo.start.getTime()) / 60000));
     const widForForm = effectiveWorkshopIdForActions(workshopId, workshops);
     modalWorkshopIdRef.current = widForForm;
-    setForm({ workshopId: widForForm, date: dateStr, time, capacity: 6, freeze: true, durationMinutes: diffMinutes });
+    setForm({
+      workshopId: widForForm,
+      date: dateStr,
+      time,
+      capacity: 6,
+      manualOccupiedSeats: 0,
+      freeze: true,
+      durationMinutes: diffMinutes,
+    });
     setDateTimeLocal(toDateTimeLocalValue(dateStr, time));
 
     let createDateRange: { dateFrom: string; dateTo: string } | undefined;
@@ -252,6 +290,8 @@ export default function Calendar() {
       date: slot.date,
       time: slot.time,
       capacity: slot.capacity,
+      manualOccupiedSeats:
+        slot.manualOccupiedSeats != null ? slot.manualOccupiedSeats : (slot.bookedSeats ?? 0),
       freeze: slot.status === 'HELD',
       durationMinutes: slot.durationMinutes ?? slot.workshop?.durationMinutes ?? 120,
     });
@@ -285,12 +325,16 @@ export default function Calendar() {
     setCreating(true);
     setCreateProgress(null);
     try {
-      const payload = {
-        ...form,
+      const slotCreateBase = () => ({
         workshopId: wid,
-        durationMinutes: form.durationMinutes,
+        date: form.date,
+        time: form.time && form.time.length >= 5 ? form.time.slice(0, 5) : '12:00',
         capacity: form.capacity,
-      };
+        manualOccupiedSeats: form.manualOccupiedSeats,
+        offlineOccupiedSeats: 0,
+        freeze: form.freeze,
+        durationMinutes: form.durationMinutes,
+      });
       const range = modal?.createDateRange;
       const scope = createScope;
 
@@ -310,10 +354,9 @@ export default function Calendar() {
           const dateStr = formatLocalYMD(d);
           setCreateProgress(`${i + 1} / ${days}`);
           await createSlot({
-            workshopId: wid,
+            ...slotCreateBase(),
             date: dateStr,
             time,
-            capacity: payload.capacity,
             freeze: false,
             durationMinutes: duration,
           });
@@ -331,19 +374,18 @@ export default function Calendar() {
           const duration = getWorkshopDuration(wid);
           for (const date of dates) {
             await createSlot({
-              workshopId: wid,
+              ...slotCreateBase(),
               date,
               time: '00:00',
-              capacity: payload.capacity,
               freeze: true,
-              durationMinutes: Math.max(1, payload.durationMinutes || duration),
+              durationMinutes: Math.max(1, form.durationMinutes || duration),
             });
           }
         } else {
-          await createSlot(payload);
+          await createSlot(slotCreateBase());
         }
       } else {
-        await createSlot(payload);
+        await createSlot(slotCreateBase());
       }
       setModal(null);
       refetchEvents();
@@ -374,6 +416,8 @@ export default function Calendar() {
       await updateSlot(slotId, {
         workshopId: wid,
         capacity: form.capacity,
+        manualOccupiedSeats: form.manualOccupiedSeats,
+        offlineOccupiedSeats: 0,
         status: form.freeze ? 'HELD' : 'OPEN',
         durationMinutes: form.durationMinutes,
       });
@@ -644,15 +688,66 @@ export default function Calendar() {
               )}
               {!modal.createDateRange && (
                 <>
+                  {modal.type === 'edit' && modal.slot && (
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 space-y-1">
+                      <p className="font-medium text-slate-800">Сверка с «Записями»</p>
+                      <p>
+                        Подтверждённые брони в базе: <strong>{modal.slot.bookedSeats ?? 0}</strong> мест · в холде:{' '}
+                        <strong>{modal.slot.heldSeats ?? 0}</strong>
+                      </p>
+                      <p className="text-xs text-slate-500 leading-snug">
+                        Ниже вы задаёте, сколько мест считать занятыми <strong>на сайте</strong>. Обычно совпадает с
+                        бронями; можно уменьшить (например 2 из 6), чтобы открыть запись, или увеличить вместимость
+                        (7, 8…). Холды всегда вычитаются отдельно.
+                      </p>
+                    </div>
+                  )}
                   <div>
-                    <label className="block text-sm text-slate-600">Вместимость</label>
+                    <label className="block text-sm text-slate-600">Вместимость слота (всего мест)</label>
                     <input
                       type="number"
-                      min={1}
+                      min={
+                        modal.type === 'edit' && modal.slot
+                          ? Math.max(1, form.manualOccupiedSeats + (modal.slot.heldSeats ?? 0))
+                          : Math.max(1, form.manualOccupiedSeats)
+                      }
                       value={form.capacity}
                       onChange={(e) => setForm((f) => ({ ...f, capacity: parseInt(e.target.value, 10) || 1 }))}
                       className="mt-1 w-full rounded border px-3 py-2"
                     />
+                    {modal.type === 'edit' && modal.slot && (
+                      <p className="mt-1 text-xs text-slate-500">
+                        Минимум: «Количество слотов» + холды = {form.manualOccupiedSeats + (modal.slot.heldSeats ?? 0)}
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm text-slate-600">Количество слотов (занято для сайта)</label>
+                    <p className="mt-0.5 text-xs text-slate-500">
+                      Сколько мест считать занятыми при показе «осталось мест» на сайте (не больше вместимости).
+                    </p>
+                    <input
+                      type="number"
+                      min={0}
+                      max={Math.max(
+                        0,
+                        form.capacity - (modal.type === 'edit' && modal.slot ? (modal.slot.heldSeats ?? 0) : 0)
+                      )}
+                      step={1}
+                      value={form.manualOccupiedSeats}
+                      onChange={(e) =>
+                        setForm((f) => ({
+                          ...f,
+                          manualOccupiedSeats: Math.max(0, parseInt(e.target.value, 10) || 0),
+                        }))
+                      }
+                      className="mt-1 w-full rounded border px-3 py-2"
+                    />
+                    {modal.type === 'edit' && modal.slot && form.manualOccupiedSeats < (modal.slot.bookedSeats ?? 0) && (
+                      <p className="mt-1 text-xs text-amber-800">
+                        Меньше, чем подтверждённых броней в базе — на сайте откроются места; убедитесь, что это нужно.
+                      </p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm text-slate-600">Длительность (мин)</label>

@@ -30,6 +30,10 @@ model Slot {
   date       String   // YYYY-MM-DD
   time       String   // HH:MM
   capacity   Int      // capacityTotal
+  /// Если задано — для расчёта свободных мест на сайте вместо (сумма подтверждённых броней + offline). Иначе по факту броней.
+  manualOccupiedSeats Int?
+  /// Места, занятые вне записей на сайте (офлайн) — только когда manualOccupiedSeats не задан
+  offlineOccupiedSeats Int @default(0)
   durationMinutes Int? // optional override (e.g. long admin hold)
   status     String   @default("OPEN") // OPEN, HELD, CANCELLED
   createdAt  DateTime @default(now())

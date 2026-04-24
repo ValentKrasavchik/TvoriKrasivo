@@ -10,6 +10,7 @@ async function main() {
     { id: 'w4', title: 'Детский мастер-класс', description: 'Творческое занятие для детей от 6 лет.', durationMinutes: 90, capacityPerSlot: 8, result: 'Фигурка или поделка на выбор', price: 1200, isActive: true },
   ];
 
+  await prisma.workshopRequest.deleteMany({});
   await prisma.seatHold.deleteMany({});
   await prisma.booking.deleteMany({});
   await prisma.slot.deleteMany({});

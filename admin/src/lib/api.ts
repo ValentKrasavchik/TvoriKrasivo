@@ -166,7 +166,15 @@ export async function fetchSlots(params?: { workshopId?: string; dateFrom?: stri
   return data;
 }
 
-export async function createSlot(data: { workshopId: string; date: string; time: string; capacity?: number; freeze?: boolean; durationMinutes?: number }) {
+export async function createSlot(data: {
+  workshopId: string;
+  date: string;
+  time: string;
+  capacity?: number;
+  freeze?: boolean;
+  durationMinutes?: number;
+  offlineOccupiedSeats?: number;
+}) {
   const res = await fetch(`${API}/admin/slots`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
@@ -179,6 +187,8 @@ export async function createSlot(data: { workshopId: string; date: string; time:
 export async function updateSlot(id: string, data: {
   status?: string;
   capacity?: number;
+  offlineOccupiedSeats?: number;
+  manualOccupiedSeats?: number | null;
   durationMinutes?: number;
   workshopId?: string;
 }) {

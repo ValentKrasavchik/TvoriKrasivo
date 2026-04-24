@@ -5,7 +5,7 @@ import jwt from 'jsonwebtoken';
 import multer from 'multer';
 import { requireAdmin } from '../middleware/requireAdmin';
 import { prisma } from '../lib/prisma';
-import { getSlotsWithAvailability } from '../lib/slotAvailability';
+import { getSlotsWithAvailability, getSlotAvailability } from '../lib/slotAvailability';
 import { normalizePhone } from '../lib/validation';
 import { isAllowedContactHref, isAllowedContactIconKey, isAllowedCustomIconUrl } from '../lib/contactBlocks';
 
@@ -320,7 +320,8 @@ adminRouter.get('/slots', async (req: Request, res: Response) => {
 
 adminRouter.post('/slots', async (req: Request, res: Response) => {
   try {
-    const { workshopId, date, time, capacity, freeze, status, durationMinutes } = req.body || {};
+    const { workshopId, date, time, capacity, freeze, status, durationMinutes, offlineOccupiedSeats, manualOccupiedSeats } =
+      req.body || {};
     if (!workshopId || !date || !time) {
       return res.status(400).json({ error: 'workshopId, date, time required' });
     }
@@ -328,9 +329,61 @@ adminRouter.post('/slots', async (req: Request, res: Response) => {
     const workshop = await prisma.workshop.findUnique({ where: { id: workshopId } });
     if (!workshop) return res.status(404).json({ error: 'Workshop not found' });
 
+    const existingSlot = await prisma.slot.findUnique({
+      where: {
+        workshopId_date_time: { workshopId, date: String(date), time: String(time) },
+      },
+    });
+
     const cap = capacity != null
       ? Math.max(1, parseInt(String(capacity), 10) || 6)
       : workshop.capacityPerSlot;
+    let offline = 0;
+    if (offlineOccupiedSeats !== undefined && offlineOccupiedSeats !== null && offlineOccupiedSeats !== '') {
+      const o = parseInt(String(offlineOccupiedSeats), 10);
+      if (!Number.isFinite(o) || o < 0) {
+        return res.status(400).json({ error: 'offlineOccupiedSeats must be >= 0' });
+      }
+      offline = o;
+    } else if (existingSlot) {
+      offline = existingSlot.offlineOccupiedSeats ?? 0;
+    }
+
+    let manual: number | null = null;
+    if ('manualOccupiedSeats' in (req.body || {})) {
+      if (manualOccupiedSeats === null || manualOccupiedSeats === '') {
+        manual = null;
+      } else {
+        const m = parseInt(String(manualOccupiedSeats), 10);
+        if (!Number.isFinite(m) || m < 0) {
+          return res.status(400).json({ error: 'manualOccupiedSeats must be >= 0 или null' });
+        }
+        manual = m;
+      }
+    } else if (existingSlot) {
+      manual = existingSlot.manualOccupiedSeats ?? null;
+    }
+
+    if (!existingSlot && manual != null && manual > cap) {
+      return res.status(400).json({ error: 'Занято мест не может быть больше вместимости слота' });
+    }
+
+    if (existingSlot) {
+      const truth = await getSlotAvailability(prisma, {
+        ...existingSlot,
+        capacity: cap,
+        manualOccupiedSeats: null,
+        offlineOccupiedSeats: 0,
+      });
+      const nonHoldTarget = manual != null ? manual : truth.bookedSeats + offline;
+      const usedTotal = nonHoldTarget + truth.heldSeats;
+      if (usedTotal > cap) {
+        return res.status(400).json({
+          error: `Занято для сайта (${nonHoldTarget}) и в холде (${truth.heldSeats}) в сумме ${usedTotal} — больше вместимости ${cap}.`,
+        });
+      }
+    }
+
     const duration =
       durationMinutes != null
         ? Math.max(1, parseInt(String(durationMinutes), 10) || workshop.durationMinutes)
@@ -348,6 +401,8 @@ adminRouter.post('/slots', async (req: Request, res: Response) => {
       },
       update: {
         capacity: cap,
+        offlineOccupiedSeats: offline,
+        manualOccupiedSeats: manual,
         status: desiredStatus,
         ...(durationMinutes != null ? { durationMinutes: duration } : {}),
       },
@@ -356,6 +411,8 @@ adminRouter.post('/slots', async (req: Request, res: Response) => {
         date: String(date),
         time: String(time),
         capacity: cap,
+        offlineOccupiedSeats: offline,
+        manualOccupiedSeats: manual,
         durationMinutes: duration,
         status: desiredStatus,
       },
@@ -385,11 +442,49 @@ adminRouter.patch('/slots/:id', async (req: Request, res: Response) => {
       const c = parseInt(String(body.capacity), 10);
       data.capacity = Number.isFinite(c) && c >= 1 ? c : 1;
     }
+    if (body.offlineOccupiedSeats !== undefined) {
+      const o = parseInt(String(body.offlineOccupiedSeats), 10);
+      if (!Number.isFinite(o) || o < 0) {
+        return res.status(400).json({ error: 'offlineOccupiedSeats must be >= 0' });
+      }
+      data.offlineOccupiedSeats = o;
+    }
+    if ('manualOccupiedSeats' in body) {
+      if (body.manualOccupiedSeats === null || body.manualOccupiedSeats === '') {
+        data.manualOccupiedSeats = null;
+      } else {
+        const m = parseInt(String(body.manualOccupiedSeats), 10);
+        if (!Number.isFinite(m) || m < 0) {
+          return res.status(400).json({ error: 'manualOccupiedSeats must be >= 0 или null' });
+        }
+        data.manualOccupiedSeats = m;
+      }
+    }
     if (body.durationMinutes !== undefined) {
       const d = parseInt(String(body.durationMinutes), 10);
       data.durationMinutes = Number.isFinite(d) && d >= 1 ? d : 1;
     }
 
+    const nextCapacity = (data.capacity as number | undefined) ?? existing.capacity;
+    const nextOffline =
+      (data.offlineOccupiedSeats as number | undefined) ?? existing.offlineOccupiedSeats ?? 0;
+    const nextManual = 'manualOccupiedSeats' in body
+      ? ((data.manualOccupiedSeats as number | null | undefined) ?? null)
+      : (existing.manualOccupiedSeats ?? null);
+
+    const truth = await getSlotAvailability(prisma, {
+      ...existing,
+      capacity: Math.max(existing.capacity, nextCapacity),
+      manualOccupiedSeats: null,
+      offlineOccupiedSeats: 0,
+    });
+    const nonHoldTarget = nextManual != null ? nextManual : truth.bookedSeats + nextOffline;
+    const usedTotal = nonHoldTarget + truth.heldSeats;
+    if (usedTotal > nextCapacity) {
+      return res.status(400).json({
+        error: `Занято для сайта (${nonHoldTarget}) и в холде (${truth.heldSeats}) в сумме ${usedTotal} — больше вместимости ${nextCapacity}. Увеличьте вместимость или уменьшите «занято вручную».`,
+      });
+    }
     const wantsWorkshopChange =
       body.workshopId !== undefined && String(body.workshopId) !== existing.workshopId;
 
@@ -668,7 +763,6 @@ adminRouter.patch('/workshop-requests/:id', async (req: Request, res: Response) 
     const body = req.body || {};
     const existing = await prisma.workshopRequest.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ error: 'Request not found' });
-    if (existing.status !== 'NEW') return res.status(409).json({ error: 'Можно редактировать только новые заявки' });
 
     const data: any = {};
     const nextWorkshopId = body.workshopId !== undefined ? String(body.workshopId) : existing.workshopId;
@@ -693,23 +787,90 @@ adminRouter.patch('/workshop-requests/:id', async (req: Request, res: Response) 
       data.phone = normalized;
     }
 
-    if (nextDate !== existing.date || nextTime !== existing.time) {
-      const slotConflict = await prisma.slot.findFirst({
-        where: { date: nextDate, time: nextTime },
-        select: { id: true },
+    const updated = await prisma.$transaction(async (tx) => {
+      const current = await tx.workshopRequest.findUnique({
+        where: { id },
+        include: { confirmedSlot: true },
       });
-      if (slotConflict) {
-        return res.status(409).json({ error: 'На эту дату и время уже есть мастер-класс' });
-      }
-    }
+      if (!current) throw new Error('NOT_FOUND');
 
-    const updated = await prisma.workshopRequest.update({
-      where: { id },
-      data,
-      include: { workshop: true, confirmedSlot: true },
+      const status = String(current.status || '');
+      const isConfirmed = status === 'CONFIRMED';
+      if (status !== 'NEW' && status !== 'CONFIRMED') {
+        throw new Error('STATUS_LOCKED');
+      }
+
+      // Конфликт по дате/времени: в проекте запрещено два слота в одно время (независимо от МК).
+      if (nextDate !== current.date || nextTime !== current.time || (body.workshopId !== undefined && nextWorkshopId !== current.workshopId)) {
+        const conflict = await tx.slot.findFirst({
+          where: {
+            date: nextDate,
+            time: nextTime,
+            ...(isConfirmed && current.confirmedSlotId ? { NOT: { id: current.confirmedSlotId } } : {}),
+          },
+          select: { id: true },
+        });
+        if (conflict) {
+          throw new Error('SLOT_CONFLICT');
+        }
+      }
+
+      // 1) Обновляем заявку
+      const reqUpdated = await tx.workshopRequest.update({
+        where: { id },
+        data,
+        include: { workshop: true, confirmedSlot: true },
+      });
+
+      // 2) Если заявка уже подтверждена — синхронизируем связанный слот календаря
+      if (isConfirmed) {
+        const slotId = reqUpdated.confirmedSlotId;
+        if (!slotId) throw new Error('NO_CONFIRMED_SLOT');
+
+        const ws = await tx.workshop.findUnique({ where: { id: reqUpdated.workshopId } });
+        if (!ws) throw new Error('WORKSHOP_NOT_FOUND');
+
+        const slotRow = await tx.slot.findUnique({ where: { id: slotId } });
+        if (!slotRow) throw new Error('NO_CONFIRMED_SLOT');
+        const usage = await getSlotAvailability(tx, slotRow);
+        const minFromUsage = usage.bookedSeats + usage.heldSeats + usage.offlineOccupiedSeats;
+        const nextCapacity = Math.max(ws.capacityPerSlot, minFromUsage);
+
+        await tx.slot.update({
+          where: { id: slotId },
+          data: {
+            workshopId: reqUpdated.workshopId,
+            date: reqUpdated.date,
+            time: reqUpdated.time,
+            capacity: nextCapacity,
+            durationMinutes: ws.durationMinutes,
+          },
+        });
+
+        // В Booking дублируется workshopId — держим в синхроне со слотом
+        await tx.booking.updateMany({
+          where: { slotId },
+          data: { workshopId: reqUpdated.workshopId },
+        });
+      }
+
+      return reqUpdated;
     });
+
     res.json(updated);
   } catch (e) {
+    if ((e as any)?.message === 'SLOT_CONFLICT') {
+      return res.status(409).json({ error: 'На эту дату и время уже есть мастер-класс' });
+    }
+    if ((e as any)?.message === 'STATUS_LOCKED') {
+      return res.status(409).json({ error: 'Заявка уже обработана и не может быть отредактирована' });
+    }
+    if ((e as any)?.message === 'NO_CONFIRMED_SLOT') {
+      return res.status(409).json({ error: 'У подтверждённой заявки не найден связанный слот' });
+    }
+    if ((e as any)?.message === 'WORKSHOP_NOT_FOUND') {
+      return res.status(404).json({ error: 'Workshop not found' });
+    }
     console.error('PATCH /api/admin/workshop-requests/:id', e);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -911,6 +1072,20 @@ adminRouter.post('/workshop-requests/:id/confirm', async (req: Request, res: Res
           capacity: request.workshop.capacityPerSlot,
           durationMinutes: request.workshop.durationMinutes,
           status: 'OPEN',
+        },
+      });
+
+      const participantsBooked = Math.max(1, request.participants);
+      await tx.booking.create({
+        data: {
+          workshopId: request.workshopId,
+          slotId: createdSlot.id,
+          name: request.name,
+          phone: request.phone,
+          messenger: request.messenger,
+          participants: participantsBooked,
+          comment: request.comment,
+          status: 'CONFIRMED',
         },
       });
 

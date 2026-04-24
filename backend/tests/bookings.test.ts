@@ -160,19 +160,54 @@ describe('Public bookings API', () => {
   });
 });
 
-describe('Race: two concurrent bookings on same slot', () => {
-  it('two requests 4 participants each on capacity 6 → one CONFIRMED, one overflow (202)', async () => {
+describe('Workshop request confirm', () => {
+  it('creates CONFIRMED booking so freeSeats reflect заявку', async () => {
+    const token = await getAdminToken();
+    const futureDate = '2030-07-15';
+    const time = '15:00';
+
+    const wr = await request(app)
+      .post('/api/public/workshop-requests')
+      .send({
+        workshopId: 'w2',
+        date: futureDate,
+        time,
+        name: 'Иван и Мария',
+        phone: '+7 900 111-22-33',
+        messenger: 'Telegram',
+        participants: 2,
+        comment: null,
+        honeypot: '',
+      });
+    expect(wr.status).toBe(201);
+    const reqId = wr.body.id;
+
+    await request(app)
+      .post('/api/admin/workshop-requests/' + reqId + '/confirm')
+      .set('Authorization', 'Bearer ' + token)
+      .expect(200);
+
+    const slotsRes = await request(app)
+      .get('/api/public/slots')
+      .query({ workshopId: 'w2', dateFrom: futureDate, dateTo: futureDate });
+    expect(slotsRes.status).toBe(200);
+    expect(slotsRes.body.length).toBe(1);
+    const created = slotsRes.body[0];
+    expect(created.capacityTotal).toBe(2);
+    expect(created.capacityBooked).toBe(2);
+    expect(created.freeSeats).toBe(0);
+  });
+});
+
+describe('Overflow when slot is full', () => {
+  it('two requests 4 participants each on capacity 4 → first CONFIRMED, second overflow (202)', async () => {
     const slotId = await getSlotId('w3', '2026-02-09');
     const payload1 = validBookingPayload(slotId, 4);
     const payload2 = { ...validBookingPayload(slotId, 4), phone: '+7 999 111-22-33' };
 
-    const [res1, res2] = await Promise.all([
-      request(app).post('/api/public/bookings').send(payload1),
-      request(app).post('/api/public/bookings').send(payload2),
-    ]);
-
-    const statuses = [res1.status, res2.status].sort();
-    expect([201, 202]).toEqual(expect.arrayContaining([res1.status, res2.status]));
+    const res1 = await request(app).post('/api/public/bookings').send(payload1);
+    const res2 = await request(app).post('/api/public/bookings').send(payload2);
+    expect([res1.status, res2.status].sort()).toEqual([201, 202].sort());
     const confirmed = res1.status === 201 ? res1.body : res2.body;
     const pending = res1.status === 202 ? res1.body : res2.body;
     expect(confirmed.status).toBe('CONFIRMED');
