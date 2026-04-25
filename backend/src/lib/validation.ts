@@ -14,3 +14,12 @@ export function normalizePhone(phone: string): string | null {
   }
   return '+7' + normalized;
 }
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Нормализует email (trim, lower case). Возвращает null, если формат неверный. */
+export function normalizeEmail(email: string): string | null {
+  const trimmed = String(email).trim().toLowerCase();
+  if (!trimmed || trimmed.length > 254 || !EMAIL_RE.test(trimmed)) return null;
+  return trimmed;
+}

@@ -10,6 +10,7 @@ type WorkshopRequest = {
   time: string;
   name: string;
   phone: string;
+  email: string;
   messenger: string;
   participants: number;
   comment: string | null;
@@ -30,6 +31,7 @@ export default function NewWorkshopRequests() {
     time: '12:00',
     name: '',
     phone: '',
+    email: '',
     messenger: '',
     participants: 1,
     comment: '',
@@ -67,6 +69,7 @@ export default function NewWorkshopRequests() {
       time: item.time,
       name: item.name,
       phone: item.phone,
+      email: item.email || '',
       messenger: item.messenger,
       participants: item.participants || 1,
       comment: item.comment || '',
@@ -83,6 +86,7 @@ export default function NewWorkshopRequests() {
         time: form.time,
         name: form.name,
         phone: form.phone,
+        email: form.email,
         messenger: form.messenger,
         participants: form.participants,
         comment: form.comment || null,
@@ -147,6 +151,7 @@ export default function NewWorkshopRequests() {
                   <td className="px-4 py-3">
                     <div>{r.name}</div>
                     <div className="text-xs text-slate-500">{r.phone}</div>
+                    {r.email ? <div className="break-all text-xs text-slate-500">{r.email}</div> : null}
                   </td>
                   <td className="px-4 py-3">{r.status === 'NEW' ? 'Новая' : r.status === 'CONFIRMED' ? 'Подтверждена' : r.status}</td>
                   <td className="px-4 py-3">
@@ -200,6 +205,10 @@ export default function NewWorkshopRequests() {
               <div>
                 <label className="block text-sm text-slate-600">Телефон</label>
                 <input type="text" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} className="mt-1 w-full rounded border px-3 py-2" />
+              </div>
+              <div>
+                <label className="block text-sm text-slate-600">Email</label>
+                <input type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} className="mt-1 w-full rounded border px-3 py-2" />
               </div>
               <div>
                 <label className="block text-sm text-slate-600">Мессенджер</label>

@@ -204,6 +204,13 @@ function validatePhone(phone) {
   return digits.length >= 10 && digits.length <= 11;
 }
 
+/** Простая проверка email (согласована с бэкендом). */
+function validateEmail(email) {
+  var s = String(email || '').trim();
+  if (!s || s.length > 254) return false;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
+}
+
 /**
  * Форматирование телефона при вводе
  */
@@ -1511,13 +1518,14 @@ async function submitWorkshopRequestForm(e) {
   var dateTimeRaw = (document.getElementById('requestDateTime') || {}).value || '';
   var name = ((document.getElementById('requestName') || {}).value || '').trim();
   var phone = ((document.getElementById('requestPhone') || {}).value || '').trim();
+  var email = ((document.getElementById('requestEmail') || {}).value || '').trim();
   var messenger = (document.getElementById('requestMessenger') || {}).value || '';
   var participants = parseInt((document.getElementById('requestParticipants') || {}).value || '1', 10) || 1;
   var comment = ((document.getElementById('requestComment') || {}).value || '').trim();
   var consent = !!((document.getElementById('requestConsent') || {}).checked);
   var honeypot = ((document.getElementById('requestHoneypot') || {}).value || '').trim();
 
-  if (!workshopId || !name || !phone || !messenger || !consent) {
+  if (!workshopId || !name || !phone || !email || !messenger || !consent) {
     if (err) {
       err.textContent = 'Заполните обязательные поля и подтвердите согласие';
       err.style.display = 'block';
@@ -1527,6 +1535,13 @@ async function submitWorkshopRequestForm(e) {
   if (!validatePhone(phone)) {
     if (err) {
       err.textContent = 'Введите корректный телефон';
+      err.style.display = 'block';
+    }
+    return;
+  }
+  if (!validateEmail(email)) {
+    if (err) {
+      err.textContent = 'Введите корректный email';
       err.style.display = 'block';
     }
     return;
@@ -1550,6 +1565,7 @@ async function submitWorkshopRequestForm(e) {
         time: timePart,
         name,
         phone,
+        email,
         messenger,
         participants,
         comment: comment || null,
@@ -1558,7 +1574,9 @@ async function submitWorkshopRequestForm(e) {
     });
     const data = await res.json().catch(function () { return {}; });
     if (!res.ok) {
-      throw new Error((data && data.error) || 'Не удалось отправить заявку');
+      var msg = (data && data.error) || 'Не удалось отправить заявку';
+      if (data && data.fields && data.fields.email) msg = data.fields.email;
+      throw new Error(msg);
     }
 
     closeWorkshopRequestModal();
@@ -2651,6 +2669,11 @@ async function submitBookingForm(e) {
     showError('phone', 'Пожалуйста, введите корректный номер телефона');
     isValid = false;
   }
+  const email = document.getElementById('bookingEmail').value.trim();
+  if (!validateEmail(email)) {
+    showError('email', 'Пожалуйста, введите корректный email');
+    isValid = false;
+  }
   const messenger = document.getElementById('bookingMessenger').value;
   if (!messenger) {
     showError('messenger', 'Пожалуйста, выберите способ связи');
@@ -2690,6 +2713,7 @@ async function submitBookingForm(e) {
         ...(selectedSlot && !selectedSlot.id ? { workshopId: selectedWorkshop.id, date: selectedSlot.date, time: selectedSlot.time } : {}),
         name,
         phone,
+        email,
         messenger,
         participants: participants,
         comment,

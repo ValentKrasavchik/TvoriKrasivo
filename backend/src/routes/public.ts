@@ -1,7 +1,9 @@
 import { Router, Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import { prisma } from '../lib/prisma';
-import { normalizePhone } from '../lib/validation';
+import { normalizePhone, normalizeEmail } from '../lib/validation';
+import { sendBookingConfirmationEmail } from '../lib/bookingConfirmationMail';
+import { sendWorkshopRequestConfirmationEmail } from '../lib/workshopRequestConfirmationMail';
 import { getSlotsWithAvailability } from '../lib/slotAvailability';
 
 export const publicRouter = Router();
@@ -169,6 +171,7 @@ publicRouter.post('/workshop-requests', bookingLimiter, async (req: Request, res
       time,
       name,
       phone,
+      email,
       messenger,
       participants = 1,
       comment,
@@ -179,7 +182,7 @@ publicRouter.post('/workshop-requests', bookingLimiter, async (req: Request, res
       return res.status(400).json({ error: 'Invalid request' });
     }
 
-    if (!workshopId || !date || !time || !name || !phone || !messenger) {
+    if (!workshopId || !date || !time || !name || !phone || !email || !messenger) {
       return res.status(400).json({
         error: 'Validation error',
         fields: {
@@ -188,6 +191,7 @@ publicRouter.post('/workshop-requests', bookingLimiter, async (req: Request, res
           ...(!time && { time: 'Required' }),
           ...(!name?.trim() && { name: 'Required' }),
           ...(!phone?.trim() && { phone: 'Required' }),
+          ...(!String(email).trim() && { email: 'Required' }),
           ...(!messenger && { messenger: 'Required' }),
         },
       });
@@ -196,6 +200,10 @@ publicRouter.post('/workshop-requests', bookingLimiter, async (req: Request, res
     const phoneNorm = normalizePhone(phone);
     if (!phoneNorm) {
       return res.status(400).json({ error: 'Validation error', fields: { phone: 'Invalid phone number' } });
+    }
+    const emailNorm = normalizeEmail(email);
+    if (!emailNorm) {
+      return res.status(400).json({ error: 'Validation error', fields: { email: 'Некорректный email' } });
     }
 
     const participantsNum = Math.max(1, parseInt(String(participants), 10) || 1);
@@ -224,12 +232,30 @@ publicRouter.post('/workshop-requests', bookingLimiter, async (req: Request, res
         time: String(time),
         name: String(name).trim(),
         phone: phoneNorm,
+        email: emailNorm,
         messenger: String(messenger).trim(),
         participants: participantsNum,
         comment: comment ? String(comment).trim() : null,
         status: 'NEW',
       },
     });
+
+    try {
+      await sendWorkshopRequestConfirmationEmail({
+        recipientEmail: emailNorm,
+        workshopTitle: workshop.title,
+        priceRub: workshop.price,
+        date: String(date),
+        time: String(time),
+        name: String(name).trim(),
+        phone: phoneNorm,
+        messenger: String(messenger).trim(),
+        participants: participantsNum,
+        comment: comment ? String(comment).trim() : null,
+      });
+    } catch (mailErr) {
+      console.error('POST /api/public/workshop-requests: письмо гостю', mailErr);
+    }
 
     return res.status(201).json({
       id: created.id,
@@ -245,7 +271,19 @@ publicRouter.post('/workshop-requests', bookingLimiter, async (req: Request, res
 // POST /api/public/bookings — с логикой overflow (participants > freeSeats → PENDING_ADMIN + SeatHold)
 publicRouter.post('/bookings', bookingLimiter, async (req: Request, res: Response) => {
   try {
-    const { slotId, workshopId, date, time, name, phone, messenger, participants = 1, comment, honeypot } = req.body;
+    const {
+      slotId,
+      workshopId,
+      date,
+      time,
+      name,
+      phone,
+      email,
+      messenger,
+      participants = 1,
+      comment,
+      honeypot,
+    } = req.body;
 
     if (honeypot) {
       return res.status(400).json({ error: 'Invalid request' });
@@ -254,13 +292,14 @@ publicRouter.post('/bookings', bookingLimiter, async (req: Request, res: Respons
     const hasSlotId = Boolean(slotId);
     const hasTimePick = Boolean(workshopId && date && time);
 
-    if ((!hasSlotId && !hasTimePick) || !name || !phone || !messenger) {
+    if ((!hasSlotId && !hasTimePick) || !name || !phone || !email || !messenger) {
       return res.status(400).json({
         error: 'Validation error',
         fields: {
           ...(!hasSlotId && !hasTimePick && { slotId: 'Choose time in calendar' }),
           ...(!name?.trim() && { name: 'Required' }),
           ...(!phone?.trim() && { phone: 'Required' }),
+          ...(!String(email).trim() && { email: 'Required' }),
           ...(!messenger && { messenger: 'Required' }),
         },
       });
@@ -270,6 +309,10 @@ publicRouter.post('/bookings', bookingLimiter, async (req: Request, res: Respons
     const phoneNorm = normalizePhone(phone);
     if (!phoneNorm) {
       return res.status(400).json({ error: 'Validation error', fields: { phone: 'Invalid phone number' } });
+    }
+    const emailNorm = normalizeEmail(email);
+    if (!emailNorm) {
+      return res.status(400).json({ error: 'Validation error', fields: { email: 'Некорректный email' } });
     }
 
     const result = await prisma.$transaction(async (tx) => {
@@ -320,6 +363,7 @@ publicRouter.post('/bookings', bookingLimiter, async (req: Request, res: Respons
             slotId: effectiveSlotId,
             name: String(name).trim(),
             phone: phoneNorm,
+            email: emailNorm,
             messenger: String(messenger).trim(),
             participants: participantsNum,
             comment: comment ? String(comment).trim() : null,
@@ -339,6 +383,7 @@ publicRouter.post('/bookings', bookingLimiter, async (req: Request, res: Respons
           slotId: effectiveSlotId,
           name: String(name).trim(),
           phone: phoneNorm,
+          email: emailNorm,
           messenger: String(messenger).trim(),
           participants: participantsNum,
           comment: comment ? String(comment).trim() : null,
@@ -377,6 +422,37 @@ publicRouter.post('/bookings', bookingLimiter, async (req: Request, res: Respons
         status: result.booking.status,
         message: status === 202 ? result.message : 'Booking created',
       };
+
+      const bookingRow = await prisma.booking.findUnique({
+        where: { id: result.booking.id },
+        include: { slot: { include: { workshop: true } } },
+      });
+      if (bookingRow?.email?.trim() && bookingRow.slot?.workshop) {
+        const statusRu =
+          bookingRow.status === 'PENDING_ADMIN'
+            ? 'На согласовании у администратора (ожидайте связи)'
+            : 'Подтверждена';
+        try {
+          await sendBookingConfirmationEmail({
+            recipientEmail: bookingRow.email.trim(),
+            workshopTitle: bookingRow.slot.workshop.title,
+            priceRub: bookingRow.slot.workshop.price,
+            slotDate: bookingRow.slot.date,
+            slotTime: bookingRow.slot.time,
+            name: bookingRow.name,
+            phone: bookingRow.phone,
+            messenger: bookingRow.messenger,
+            participants: bookingRow.participants,
+            comment: bookingRow.comment,
+            bookingStatus: statusRu,
+          });
+        } catch (mailErr) {
+          console.error('POST /api/public/bookings: письмо гостю', mailErr);
+        }
+      } else if (bookingRow && !bookingRow.email?.trim()) {
+        console.warn('POST /api/public/bookings: запись без email, письмо не отправлено', { bookingId: bookingRow.id });
+      }
+
       return res.status(status).json(body);
     }
     return res.status(500).json({ error: 'Internal server error' });

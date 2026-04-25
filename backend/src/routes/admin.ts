@@ -6,7 +6,7 @@ import multer from 'multer';
 import { requireAdmin } from '../middleware/requireAdmin';
 import { prisma } from '../lib/prisma';
 import { getSlotsWithAvailability, getSlotAvailability } from '../lib/slotAvailability';
-import { normalizePhone } from '../lib/validation';
+import { normalizePhone, normalizeEmail } from '../lib/validation';
 import { isAllowedContactHref, isAllowedContactIconKey, isAllowedCustomIconUrl } from '../lib/contactBlocks';
 
 const uploadsDir = path.join(process.cwd(), 'uploads');
@@ -786,6 +786,11 @@ adminRouter.patch('/workshop-requests/:id', async (req: Request, res: Response) 
       if (!normalized) return res.status(400).json({ error: 'Invalid phone number' });
       data.phone = normalized;
     }
+    if (body.email !== undefined) {
+      const normalized = normalizeEmail(String(body.email));
+      if (!normalized) return res.status(400).json({ error: 'Некорректный email' });
+      data.email = normalized;
+    }
 
     const updated = await prisma.$transaction(async (tx) => {
       const current = await tx.workshopRequest.findUnique({
@@ -850,7 +855,7 @@ adminRouter.patch('/workshop-requests/:id', async (req: Request, res: Response) 
         // В Booking дублируется workshopId — держим в синхроне со слотом
         await tx.booking.updateMany({
           where: { slotId },
-          data: { workshopId: reqUpdated.workshopId },
+          data: { workshopId: reqUpdated.workshopId, email: reqUpdated.email || '' },
         });
       }
 
@@ -1058,6 +1063,9 @@ adminRouter.post('/workshop-requests/:id/confirm', async (req: Request, res: Res
       if (!request) throw new Error('NOT_FOUND');
       if (request.status !== 'NEW') throw new Error('NOT_NEW');
 
+      const confirmEmail = normalizeEmail(request.email || '');
+      if (!confirmEmail) throw new Error('EMAIL_REQUIRED');
+
       const conflict = await tx.slot.findFirst({
         where: { date: request.date, time: request.time },
         select: { id: true },
@@ -1082,6 +1090,7 @@ adminRouter.post('/workshop-requests/:id/confirm', async (req: Request, res: Res
           slotId: createdSlot.id,
           name: request.name,
           phone: request.phone,
+          email: confirmEmail,
           messenger: request.messenger,
           participants: participantsBooked,
           comment: request.comment,
@@ -1104,6 +1113,9 @@ adminRouter.post('/workshop-requests/:id/confirm', async (req: Request, res: Res
     if (e?.message === 'NOT_FOUND') return res.status(404).json({ error: 'Request not found' });
     if (e?.message === 'NOT_NEW') return res.status(409).json({ error: 'Заявка уже обработана' });
     if (e?.message === 'SLOT_CONFLICT') return res.status(409).json({ error: 'На эту дату и время уже есть мастер-класс' });
+    if (e?.message === 'EMAIL_REQUIRED') {
+      return res.status(400).json({ error: 'В заявке нет корректного email. Отредактируйте заявку и сохраните.' });
+    }
     console.error('POST /api/admin/workshop-requests/:id/confirm', e);
     res.status(500).json({ error: 'Internal server error' });
   }

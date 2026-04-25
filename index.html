@@ -374,6 +374,11 @@
                 <p class="form-error" id="phoneError" style="display: none;"></p>
               </div>
               <div class="form-group">
+                <label class="form-label" for="bookingEmail">Email <span class="required">*</span></label>
+                <input type="email" class="form-input" id="bookingEmail" name="email" required autocomplete="email" placeholder="name@example.com">
+                <p class="form-error" id="emailError" style="display: none;"></p>
+              </div>
+              <div class="form-group">
                 <label class="form-label" for="bookingMessenger">Как с вами связаться? <span class="required">*</span></label>
                 <select class="form-select" id="bookingMessenger" name="messenger" required>
                   <option value="">Выберите способ связи</option>
@@ -451,6 +456,10 @@
           <div class="form-group">
             <label class="form-label" for="requestPhone">Телефон <span class="required">*</span></label>
             <input type="tel" class="form-input" id="requestPhone" required placeholder="+7 (___) ___-__-__">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="requestEmail">Email <span class="required">*</span></label>
+            <input type="email" class="form-input" id="requestEmail" required autocomplete="email" placeholder="name@example.com">
           </div>
           <div class="form-group">
             <label class="form-label" for="requestMessenger">Как с вами связаться? <span class="required">*</span></label>
@@ -700,10 +709,10 @@
           <p>Настоящая политика обработки персональных данных составлена в соответствии с требованиями законодательства и определяет порядок обработки персональных данных студии керамики «Твори Красиво».</p>
           
           <h3>2. Какие данные мы собираем</h3>
-          <p>Мы собираем только данные, необходимые для записи на мастер-класс: имя, номер телефона и предпочтительный способ связи.</p>
+          <p>Мы собираем только данные, необходимые для записи на мастер-класс: имя, номер телефона, адрес электронной почты и предпочтительный способ связи.</p>
           
           <h3>3. Цели обработки данных</h3>
-          <p>Ваши данные используются исключительно для связи с вами по вопросам записи на мастер-классы и информирования о статусе вашей заявки.</p>
+          <p>Ваши данные используются для связи с вами по вопросам записи на мастер-классы, информирования о статусе заявки и отправки уведомления о записи на указанный email (сервис рассылки Unisender).</p>
           
           <h3>4. Защита данных</h3>
           <p>Мы не передаём ваши данные третьим лицам и храним их в защищённом виде. Данные удаляются по вашему запросу.</p>

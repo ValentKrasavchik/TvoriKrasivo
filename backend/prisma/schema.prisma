@@ -53,6 +53,7 @@ model WorkshopRequest {
   time            String   // HH:MM
   name            String
   phone           String
+  email           String   @default("")
   messenger       String
   participants    Int      @default(1)
   comment         String?
@@ -73,10 +74,12 @@ model Booking {
   slot         Slot     @relation(fields: [slotId], references: [id], onDelete: Restrict)
   name         String
   phone        String
+  email        String   @default("")
   messenger    String
   participants Int      @default(1)
   comment      String?
   status       String   @default("CONFIRMED") // CONFIRMED, PENDING_ADMIN, CANCELLED, REJECTED
+  reminderSentAt DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   seatHold     SeatHold?

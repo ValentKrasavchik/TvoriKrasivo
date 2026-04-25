@@ -12,7 +12,8 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:seed": "ts-node prisma/seed.ts",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "email:test": "ts-node scripts/send-smtp-test.ts"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
@@ -26,7 +27,8 @@
     "express-rate-limit": "^7.4.0",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
-    "multer": "^2.0.2"
+    "multer": "^2.0.2",
+    "nodemailer": "^6.9.16"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
@@ -34,6 +36,7 @@
     "@types/express": "^4.17.21",
     "@types/jsonwebtoken": "^9.0.6",
     "@types/multer": "^2.0.0",
+    "@types/nodemailer": "^6.4.17",
     "@types/node": "^22.9.0",
     "@types/supertest": "^6.0.2",
     "prisma": "^5.22.0",

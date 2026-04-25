@@ -6,6 +6,7 @@ type Booking = {
   slotId: string;
   name: string;
   phone: string;
+  email: string;
   messenger: string;
   participants: number;
   comment: string | null;
@@ -186,6 +187,9 @@ export default function Bookings() {
                   {b.slot.date} {b.slot.time} — {WORKSHOPS[b.slot.workshopId] || b.slot.workshopId}
                 </p>
                 <p className="text-sm text-slate-500">{b.phone}</p>
+                {b.email ? (
+                  <p className="text-sm text-slate-500">{b.email}</p>
+                ) : null}
                 <p className="text-sm text-slate-600">
                   <span className="text-slate-500">Связь:</span> {b.messenger}
                 </p>
@@ -227,6 +231,7 @@ export default function Bookings() {
                 <th className="border-b border-slate-200 px-4 py-3 text-left font-medium">Мастер-класс</th>
                 <th className="border-b border-slate-200 px-4 py-3 text-left font-medium">Имя</th>
                 <th className="border-b border-slate-200 px-4 py-3 text-left font-medium">Телефон</th>
+                <th className="border-b border-slate-200 px-4 py-3 text-left font-medium">Email</th>
                 <th className="border-b border-slate-200 px-4 py-3 text-left font-medium">Связь</th>
                 <th className="border-b border-slate-200 px-4 py-3 text-left font-medium">Участников</th>
                 <th className="min-w-[10rem] border-b border-slate-200 px-4 py-3 text-left font-medium">Комментарий</th>
@@ -243,6 +248,7 @@ export default function Bookings() {
                   <td className="px-4 py-3">{WORKSHOPS[b.slot.workshopId] || b.slot.workshopId}</td>
                   <td className="px-4 py-3 font-medium text-slate-800">{b.name}</td>
                   <td className="whitespace-nowrap px-4 py-3">{b.phone}</td>
+                  <td className="max-w-[12rem] break-all px-4 py-3 text-slate-600">{b.email || '—'}</td>
                   <td className="px-4 py-3">{b.messenger}</td>
                   <td className="whitespace-nowrap px-4 py-3">{b.participants}</td>
                   <td className="max-w-[14rem] break-words px-4 py-3 text-slate-600">

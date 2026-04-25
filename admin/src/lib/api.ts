@@ -270,6 +270,7 @@ export async function updateWorkshopRequest(
     time: string;
     name: string;
     phone: string;
+    email: string;
     messenger: string;
     participants: number;
     comment: string | null;

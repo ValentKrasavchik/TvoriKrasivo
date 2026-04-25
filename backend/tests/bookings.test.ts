@@ -7,6 +7,7 @@ const validBookingPayload = (slotId: string, participants = 1) => ({
   slotId,
   name: 'Test User',
   phone: '+7 999 123-45-67',
+  email: 'guest@example.com',
   messenger: 'Telegram',
   participants,
   comment: null,
@@ -37,6 +38,14 @@ describe('Public bookings API', () => {
   beforeAll(async () => {
     slotW1 = await getSlotId('w1', '2026-02-01');
     slotW2 = await getSlotId('w2', '2026-02-01');
+  });
+
+  it('POST /api/public/bookings without email returns 400', async () => {
+    const res = await request(app)
+      .post('/api/public/bookings')
+      .send({ ...validBookingPayload(slotW1, 1), email: '' });
+    expect(res.status).toBe(400);
+    expect(res.body.fields).toHaveProperty('email');
   });
 
   it('GET /api/public/slots returns slots with freeSeats', async () => {
@@ -174,6 +183,7 @@ describe('Workshop request confirm', () => {
         time,
         name: 'Иван и Мария',
         phone: '+7 900 111-22-33',
+        email: 'ivan@example.com',
         messenger: 'Telegram',
         participants: 2,
         comment: null,
