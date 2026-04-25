@@ -5,6 +5,7 @@ import { normalizePhone, normalizeEmail } from '../lib/validation';
 import { sendBookingConfirmationEmail } from '../lib/bookingConfirmationMail';
 import { sendWorkshopRequestConfirmationEmail } from '../lib/workshopRequestConfirmationMail';
 import { getSlotsWithAvailability } from '../lib/slotAvailability';
+import { buildSalebotBookingPayload, buildSalebotWorkshopRequestPayload, sendSalebotLead } from '../lib/salebot';
 
 export const publicRouter = Router();
 
@@ -257,6 +258,26 @@ publicRouter.post('/workshop-requests', bookingLimiter, async (req: Request, res
       console.error('POST /api/public/workshop-requests: письмо гостю', mailErr);
     }
 
+    // Salebot integration (async, does not affect response)
+    const pageUrl = (req.body && (req.body.page_url || req.body.pageUrl)) || req.get('referer') || null;
+    const externalLeadId = `workshop_request_${created.id}`;
+    const payload = buildSalebotWorkshopRequestPayload({
+      phone: phoneNorm,
+      source: 'tvori-krasivo.ru',
+      service: workshop.title,
+      eventDateYyyyMmDd: String(date),
+      eventTime: String(time),
+      participants: participantsNum,
+      clientName: String(name).trim(),
+      contactMethod: String(messenger).trim(),
+      comment: comment ? String(comment).trim() : null,
+      pageUrl,
+      createdAt: created.createdAt,
+    });
+    sendSalebotLead({ prisma, externalLeadId, leadType: 'WORKSHOP_REQUEST', payload }).catch((e) => {
+      console.error('salebot: workshop-request failed', e);
+    });
+
     return res.status(201).json({
       id: created.id,
       status: created.status,
@@ -451,6 +472,28 @@ publicRouter.post('/bookings', bookingLimiter, async (req: Request, res: Respons
         }
       } else if (bookingRow && !bookingRow.email?.trim()) {
         console.warn('POST /api/public/bookings: запись без email, письмо не отправлено', { bookingId: bookingRow.id });
+      }
+
+      // Salebot integration (async, does not affect response)
+      if (bookingRow?.slot?.workshop) {
+        const pageUrl = (req.body && (req.body.page_url || req.body.pageUrl)) || req.get('referer') || null;
+        const externalLeadId = `booking_${bookingRow.id}`;
+        const payload = buildSalebotBookingPayload({
+          phone: bookingRow.phone,
+          source: 'tvori-krasivo.ru',
+          service: bookingRow.slot.workshop.title,
+          eventDateYyyyMmDd: bookingRow.slot.date,
+          eventTime: bookingRow.slot.time,
+          participants: bookingRow.participants,
+          clientName: bookingRow.name,
+          contactMethod: bookingRow.messenger,
+          comment: bookingRow.comment,
+          pageUrl,
+          createdAt: bookingRow.createdAt,
+        });
+        sendSalebotLead({ prisma, externalLeadId, leadType: 'BOOKING', payload }).catch((e) => {
+          console.error('salebot: booking failed', e);
+        });
       }
 
       return res.status(status).json(body);

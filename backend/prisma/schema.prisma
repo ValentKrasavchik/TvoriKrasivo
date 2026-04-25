@@ -139,3 +139,20 @@ model ContactBlock {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 }
+
+/// Логи callback в Salebot (защита от дублей по externalLeadId + хранение request/response)
+model SalebotCallback {
+  id             String   @id @default(uuid())
+  externalLeadId String   @unique
+  leadType       String   // BOOKING | WORKSHOP_REQUEST | etc
+  requestBody    String
+  responseBody   String?
+  httpStatus     Int?
+  attempts       Int      @default(0)
+  status         String   @default("PENDING") // PENDING | SENT | FAILED | SKIPPED
+  lastError      String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([status, createdAt])
+}
