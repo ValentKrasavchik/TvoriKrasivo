@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { fetchBookings, confirmBooking, approveBooking, rejectBooking, cancelBooking, deleteBooking, fetchWorkshops } from '../lib/api';
+import { formatSubmittedAt, slotTimeHM } from '../lib/datetimeFormat';
 
 type Booking = {
   id: string;
@@ -184,7 +185,10 @@ export default function Bookings() {
                   </span>
                 </div>
                 <p className="text-sm text-slate-600">
-                  {b.slot.date} {b.slot.time} — {WORKSHOPS[b.slot.workshopId] || b.slot.workshopId}
+                  {b.slot.date} {slotTimeHM(b.slot.time)} — {WORKSHOPS[b.slot.workshopId] || b.slot.workshopId}
+                </p>
+                <p className="text-xs text-slate-500">
+                  Записался: {formatSubmittedAt(b.createdAt)}
                 </p>
                 <p className="text-sm text-slate-500">{b.phone}</p>
                 {b.email ? (
@@ -224,10 +228,11 @@ export default function Bookings() {
           </div>
 
           {/* Таблица для десктопа */}
-          <table className="hidden min-w-[56rem] w-full text-sm md:table">
+          <table className="hidden min-w-[64rem] w-full text-sm md:table">
             <thead className="bg-slate-50">
               <tr>
-                <th className="border-b border-slate-200 px-4 py-3 text-left font-medium">Дата / время</th>
+                <th className="border-b border-slate-200 px-4 py-3 text-left font-medium">Дата / время мастер-класса</th>
+                <th className="whitespace-nowrap border-b border-slate-200 px-4 py-3 text-left font-medium">Записался</th>
                 <th className="border-b border-slate-200 px-4 py-3 text-left font-medium">Мастер-класс</th>
                 <th className="border-b border-slate-200 px-4 py-3 text-left font-medium">Имя</th>
                 <th className="border-b border-slate-200 px-4 py-3 text-left font-medium">Телефон</th>
@@ -243,8 +248,9 @@ export default function Bookings() {
               {bookings.map((b) => (
                 <tr key={b.id} className="border-b border-slate-100 hover:bg-slate-50">
                   <td className="whitespace-nowrap px-4 py-3">
-                    {b.slot.date} {b.slot.time}
+                    {b.slot.date} {slotTimeHM(b.slot.time)}
                   </td>
+                  <td className="whitespace-nowrap px-4 py-3 text-slate-600">{formatSubmittedAt(b.createdAt)}</td>
                   <td className="px-4 py-3">{WORKSHOPS[b.slot.workshopId] || b.slot.workshopId}</td>
                   <td className="px-4 py-3 font-medium text-slate-800">{b.name}</td>
                   <td className="whitespace-nowrap px-4 py-3">{b.phone}</td>

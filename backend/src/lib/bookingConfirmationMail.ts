@@ -3,7 +3,7 @@ import { sendHtmlTransactionalEmail } from './transactionalMail';
 
 export type { BookingEmailPayload };
 
-/** Уведомление гостю о записи на мастер-класс (SMTP или Unisender — см. transactionalMail). */
+/** Уведомление гостю о записи на мастер-класс (Unisender GO/классика или SMTP — см. transactionalMail). */
 export async function sendBookingConfirmationEmail(p: BookingEmailPayload): Promise<void> {
   const html = buildBookingEmailHtml(p);
   await sendHtmlTransactionalEmail(p.recipientEmail, BOOKING_CONFIRMATION_SUBJECT, html);

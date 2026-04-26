@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { confirmWorkshopRequest, deleteWorkshopRequest, fetchWorkshopRequests, fetchWorkshops, updateWorkshopRequest } from '../lib/api';
+import { formatSubmittedAt, slotTimeHM } from '../lib/datetimeFormat';
 
 type Workshop = { id: string; title: string; capacityPerSlot?: number };
 type WorkshopRequest = {
@@ -127,16 +128,17 @@ export default function NewWorkshopRequests() {
       <h1 className="mb-4 text-xl font-semibold text-slate-800 sm:text-2xl">Запись: Новый мастер-класс</h1>
       {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
         {loading ? (
           <p className="p-4">Загрузка...</p>
         ) : items.length === 0 ? (
           <p className="p-4 text-slate-500">Заявок нет.</p>
         ) : (
-          <table className="w-full text-sm">
+          <table className="min-w-[48rem] w-full text-sm">
             <thead className="bg-slate-50">
               <tr>
-                <th className="border-b border-slate-200 px-4 py-3 text-left font-medium">Дата / время</th>
+                <th className="border-b border-slate-200 px-4 py-3 text-left font-medium">Дата / время мастер-класса</th>
+                <th className="whitespace-nowrap border-b border-slate-200 px-4 py-3 text-left font-medium">Записался</th>
                 <th className="border-b border-slate-200 px-4 py-3 text-left font-medium">Мастер-класс</th>
                 <th className="border-b border-slate-200 px-4 py-3 text-left font-medium">Клиент</th>
                 <th className="border-b border-slate-200 px-4 py-3 text-left font-medium">Статус</th>
@@ -146,7 +148,10 @@ export default function NewWorkshopRequests() {
             <tbody>
               {items.map((r) => (
                 <tr key={r.id} className="border-b border-slate-100 hover:bg-slate-50">
-                  <td className="px-4 py-3">{r.date} {r.time}</td>
+                  <td className="whitespace-nowrap px-4 py-3">
+                    {r.date} {slotTimeHM(r.time)}
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3 text-slate-600">{formatSubmittedAt(r.createdAt)}</td>
                   <td className="px-4 py-3">{r.workshop?.title || workshopTitleById[r.workshopId] || r.workshopId}</td>
                   <td className="px-4 py-3">
                     <div>{r.name}</div>
@@ -178,6 +183,9 @@ export default function NewWorkshopRequests() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={(e) => { if (e.target === e.currentTarget) setEditing(null); }}>
           <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
             <h2 className="mb-4 text-lg font-semibold">Редактировать заявку</h2>
+            <p className="mb-3 text-sm text-slate-500">
+              Заявка отправлена: {formatSubmittedAt(editing.createdAt)}
+            </p>
             <div className="space-y-3">
               <div>
                 <label className="block text-sm text-slate-600">Мастер-класс</label>
