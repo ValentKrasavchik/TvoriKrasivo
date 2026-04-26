@@ -89,6 +89,15 @@ export default function Layout() {
               >
                 Контакты
               </NavLink>
+              <NavLink
+                to="/seo"
+                onClick={() => setMenuOpen(false)}
+                className={({ isActive }) =>
+                  `block rounded-lg px-3 py-2 text-sm ${isActive ? 'bg-amber-100 text-amber-900' : 'text-slate-600 hover:bg-slate-100'}`
+                }
+              >
+                SEO
+              </NavLink>
             </div>
           </div>
         </nav>

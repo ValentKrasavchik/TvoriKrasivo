@@ -6,6 +6,7 @@ import { sendBookingConfirmationEmail } from '../lib/bookingConfirmationMail';
 import { sendWorkshopRequestConfirmationEmail } from '../lib/workshopRequestConfirmationMail';
 import { getSlotsWithAvailability } from '../lib/slotAvailability';
 import { buildSalebotBookingPayload, buildSalebotWorkshopRequestPayload, sendSalebotLead } from '../lib/salebot';
+import { DEFAULT_SITE_SEO, SITE_SEO_ID, rowToPayload } from '../lib/siteSeoDefaults';
 
 export const publicRouter = Router();
 
@@ -99,6 +100,19 @@ publicRouter.get('/contacts', async (_req: Request, res: Response) => {
     });
   } catch (e) {
     console.error('GET /api/public/contacts', e);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/public/seo — мета-теги главной (для подстановки в браузере)
+publicRouter.get('/seo', async (_req: Request, res: Response) => {
+  try {
+    const row = await prisma.siteSeo.findUnique({ where: { id: SITE_SEO_ID } });
+    const payload = row ? rowToPayload(row) : DEFAULT_SITE_SEO;
+    res.set('Cache-Control', 'no-store, must-revalidate');
+    res.json(payload);
+  } catch (e) {
+    console.error('GET /api/public/seo', e);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

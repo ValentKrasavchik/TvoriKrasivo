@@ -8,6 +8,7 @@ import Workshops from './pages/Workshops';
 import Reviews from './pages/Reviews';
 import Gallery from './pages/Gallery';
 import Contacts from './pages/Contacts';
+import Seo from './pages/Seo';
 import NewWorkshopRequests from './pages/NewWorkshopRequests';
 import { getMe } from './lib/api';
 
@@ -43,6 +44,7 @@ export default function App() {
         <Route path="reviews" element={<Reviews />} />
         <Route path="gallery" element={<Gallery />} />
         <Route path="contacts" element={<Contacts />} />
+        <Route path="seo" element={<Seo />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

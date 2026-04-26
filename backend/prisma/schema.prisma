@@ -140,6 +140,19 @@ model ContactBlock {
   updatedAt      DateTime @updatedAt
 }
 
+/// SEO главной страницы (одна запись id = default)
+model SiteSeo {
+  id               String   @id
+  metaTitle        String
+  metaDescription  String
+  ogTitle          String
+  ogDescription    String
+  ogImage          String?
+  canonicalUrl     String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
 /// Логи callback в Salebot (защита от дублей по externalLeadId + хранение request/response)
 model SalebotCallback {
   id             String   @id @default(uuid())

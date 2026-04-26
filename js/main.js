@@ -38,6 +38,57 @@ function buildImageUrl(path) {
   return base + p;
 }
 
+/** Подстановка title / meta / OG / canonical с API SEO (поверх значений в index.html). */
+function applySeoFromApi(seo) {
+  if (!seo || typeof seo !== 'object') return;
+  function setMetaByName(name, content) {
+    if (content == null) return;
+    var c = String(content).trim();
+    if (!c) return;
+    var el = document.querySelector('meta[name="' + name + '"]');
+    if (!el) {
+      el = document.createElement('meta');
+      el.setAttribute('name', name);
+      document.head.appendChild(el);
+    }
+    el.setAttribute('content', c);
+  }
+  function setMetaByProperty(prop, content) {
+    if (content == null) return;
+    var c = String(content).trim();
+    if (!c) return;
+    var el = document.querySelector('meta[property="' + prop + '"]');
+    if (!el) {
+      el = document.createElement('meta');
+      el.setAttribute('property', prop);
+      document.head.appendChild(el);
+    }
+    el.setAttribute('content', c);
+  }
+  var title = String(seo.metaTitle || '').trim();
+  if (title) document.title = title;
+  var md = String(seo.metaDescription || '').trim();
+  if (md) setMetaByName('description', md);
+  var ogt = String(seo.ogTitle || '').trim();
+  if (ogt) setMetaByProperty('og:title', ogt);
+  var ogd = String(seo.ogDescription || '').trim();
+  if (ogd) setMetaByProperty('og:description', ogd);
+  var img = seo.ogImage != null ? String(seo.ogImage).trim() : '';
+  if (img) setMetaByProperty('og:image', buildImageUrl(img));
+  var can = seo.canonicalUrl != null ? String(seo.canonicalUrl).trim() : '';
+  var link = document.querySelector('link[rel="canonical"]');
+  if (can) {
+    if (!link) {
+      link = document.createElement('link');
+      link.rel = 'canonical';
+      document.head.appendChild(link);
+    }
+    link.href = can;
+  } else if (link) {
+    link.remove();
+  }
+}
+
 let workshopsData = null;
 let selectedWorkshop = null;
 let selectedSlot = null;
@@ -322,6 +373,9 @@ async function loadData() {
     fetchWithTimeout(`${API_BASE}/api/public/contacts`, { cache: 'no-store' }).catch(function () {
       return null;
     }),
+    fetchWithTimeout(`${API_BASE}/api/public/seo`, { cache: 'no-store' }).catch(function () {
+      return null;
+    }),
     fetchWithTimeout('data/workshops.json').catch(function () {
       return null;
     }),
@@ -331,7 +385,8 @@ async function loadData() {
   var revRes = responses[1];
   var galRes = responses[2];
   var cRes = responses[3];
-  var legacyRes = responses[4];
+  var seoRes = responses[4];
+  var legacyRes = responses[5];
 
   try {
     if (apiRes && apiRes.ok) {
@@ -366,6 +421,13 @@ async function loadData() {
   } catch (e) {
     console.warn('Ошибка загрузки JSON (faq/contacts):', e);
   }
+
+  try {
+    if (seoRes && seoRes.ok) {
+      var seoJson = await seoRes.json();
+      applySeoFromApi(seoJson);
+    }
+  } catch (_e) {}
 
   workshopsData = { workshops, reviews, gallery, faq, contacts };
   return workshopsData;

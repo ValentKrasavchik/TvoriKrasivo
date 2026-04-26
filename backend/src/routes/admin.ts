@@ -8,6 +8,7 @@ import { prisma } from '../lib/prisma';
 import { getSlotsWithAvailability, getSlotAvailability } from '../lib/slotAvailability';
 import { normalizePhone, normalizeEmail } from '../lib/validation';
 import { isAllowedContactHref, isAllowedContactIconKey, isAllowedCustomIconUrl } from '../lib/contactBlocks';
+import { DEFAULT_SITE_SEO, SITE_SEO_ID, rowToPayload, type SiteSeoPayload } from '../lib/siteSeoDefaults';
 
 const uploadsDir = path.join(process.cwd(), 'uploads');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
@@ -1048,6 +1049,86 @@ adminRouter.put('/contacts', async (req: Request, res: Response) => {
     });
   } catch (e) {
     console.error('PUT /api/admin/contacts', e);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// --- SEO главной страницы ---
+adminRouter.get('/seo', async (_req: Request, res: Response) => {
+  try {
+    const row = await prisma.siteSeo.findUnique({ where: { id: SITE_SEO_ID } });
+    const payload: SiteSeoPayload = row ? rowToPayload(row) : DEFAULT_SITE_SEO;
+    res.json(payload);
+  } catch (e) {
+    console.error('GET /api/admin/seo', e);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+adminRouter.put('/seo', async (req: Request, res: Response) => {
+  try {
+    const b = req.body || {};
+    const metaTitle = String(b.metaTitle ?? '').trim();
+    const metaDescription = String(b.metaDescription ?? '').trim();
+    const ogTitle = String(b.ogTitle ?? '').trim();
+    const ogDescription = String(b.ogDescription ?? '').trim();
+    const ogImageRaw = b.ogImage != null ? String(b.ogImage).trim() : '';
+    const canonicalRaw = b.canonicalUrl != null ? String(b.canonicalUrl).trim() : '';
+
+    if (!metaTitle || metaTitle.length > 200) {
+      return res.status(400).json({ error: 'Заголовок страницы (title): от 1 до 200 символов' });
+    }
+    if (!metaDescription || metaDescription.length > 500) {
+      return res.status(400).json({ error: 'Meta description: от 1 до 500 символов' });
+    }
+    if (!ogTitle || ogTitle.length > 200) {
+      return res.status(400).json({ error: 'Open Graph — заголовок: от 1 до 200 символов' });
+    }
+    if (!ogDescription || ogDescription.length > 500) {
+      return res.status(400).json({ error: 'Open Graph — описание: от 1 до 500 символов' });
+    }
+    let ogImage: string | null = ogImageRaw || null;
+    if (ogImage && ogImage.length > 500) {
+      return res.status(400).json({ error: 'URL изображения OG слишком длинный' });
+    }
+    let canonicalUrl: string | null = canonicalRaw || null;
+    if (canonicalUrl) {
+      if (canonicalUrl.length > 500) {
+        return res.status(400).json({ error: 'Canonical URL слишком длинный' });
+      }
+      try {
+        const u = new URL(canonicalUrl);
+        if (u.protocol !== 'https:' && u.protocol !== 'http:') {
+          return res.status(400).json({ error: 'Canonical: укажите http(s)://…' });
+        }
+      } catch {
+        return res.status(400).json({ error: 'Canonical: некорректный URL' });
+      }
+    }
+
+    const saved = await prisma.siteSeo.upsert({
+      where: { id: SITE_SEO_ID },
+      create: {
+        id: SITE_SEO_ID,
+        metaTitle,
+        metaDescription,
+        ogTitle,
+        ogDescription,
+        ogImage,
+        canonicalUrl,
+      },
+      update: {
+        metaTitle,
+        metaDescription,
+        ogTitle,
+        ogDescription,
+        ogImage,
+        canonicalUrl,
+      },
+    });
+    res.json(rowToPayload(saved));
+  } catch (e) {
+    console.error('PUT /api/admin/seo', e);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

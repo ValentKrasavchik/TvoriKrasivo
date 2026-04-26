@@ -401,3 +401,38 @@ export async function saveContacts(blocks: Omit<ContactBlockDto, 'id' | 'sortOrd
   if (!res.ok) throw new Error((body as { error?: string }).error || 'Ошибка сохранения');
   return body;
 }
+
+// --- SEO главной ---
+export type SiteSeoPayload = {
+  metaTitle: string;
+  metaDescription: string;
+  ogTitle: string;
+  ogDescription: string;
+  ogImage: string | null;
+  canonicalUrl: string | null;
+};
+
+export async function fetchSeo(): Promise<SiteSeoPayload> {
+  const res = await fetch(`${API}/admin/seo`, { headers: authHeaders(), cache: 'no-store' });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error((body as { error?: string }).error || 'Не удалось загрузить SEO');
+  return body as SiteSeoPayload;
+}
+
+export async function saveSeo(data: {
+  metaTitle: string;
+  metaDescription: string;
+  ogTitle: string;
+  ogDescription: string;
+  ogImage: string | null;
+  canonicalUrl: string | null;
+}): Promise<SiteSeoPayload> {
+  const res = await fetch(`${API}/admin/seo`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(data),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error((body as { error?: string }).error || 'Ошибка сохранения');
+  return body as SiteSeoPayload;
+}
