@@ -373,6 +373,8 @@ publicRouter.post('/bookings', bookingLimiter, async (req: Request, res: Respons
             capacity: ws.capacityPerSlot,
             durationMinutes: ws.durationMinutes,
             status: 'OPEN',
+            createdByRole: 'CLIENT',
+            createdByName: String(name).trim(),
           },
         });
         effectiveSlotId = upserted.id;

@@ -30,6 +30,10 @@ model Slot {
   date       String   // YYYY-MM-DD
   time       String   // HH:MM
   capacity   Int      // capacityTotal
+  /// Кто создал слот: ADMIN (админка) или CLIENT (создано гостем через сайт/заявку)
+  createdByRole String @default("ADMIN")
+  /// Имя создателя (для CLIENT — имя гостя; для ADMIN — логин админа, если доступен)
+  createdByName String?
   /// Если задано — для расчёта свободных мест на сайте вместо (сумма подтверждённых броней + offline). Иначе по факту броней.
   manualOccupiedSeats Int?
   /// Места, занятые вне записей на сайте (офлайн) — только когда manualOccupiedSeats не задан

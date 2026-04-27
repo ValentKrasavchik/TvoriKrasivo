@@ -16,6 +16,8 @@ type Slot = {
   date: string;
   time: string;
   capacity: number;
+  createdByRole?: string;
+  createdByName?: string | null;
   /** Места, занятые вне онлайн-записи (офлайн) — учитываются в свободных местах */
   offlineOccupiedSeats?: number;
   /** Если задано — для сайта вместо суммы броней (см. backend) */
@@ -95,9 +97,17 @@ function slotToEvent(s: Slot) {
   const duration = s.durationMinutes ?? s.workshop?.durationMinutes ?? 120;
   end.setMinutes(end.getMinutes() + duration);
   const labelPrefix = wTitle ? `${wTitle} · ` : '';
+  const role = String(s.createdByRole ?? '').toUpperCase();
+  const name = String(s.createdByName ?? '').trim();
+  const creator =
+    role === 'CLIENT'
+      ? (name ? `Клиент: ${name}` : 'Клиент')
+      : role === 'ADMIN'
+        ? (name ? `Админ: ${name}` : 'Админ')
+        : (name ? name : '');
   return {
     id: s.id,
-    title: `${labelPrefix}${hm} — ${s.status} — Своб: ${free}/${cap}`,
+    title: `${labelPrefix}${hm} — ${s.status} — Своб: ${free}/${cap}${creator ? ` — ${creator}` : ''}`,
     start,
     end,
     extendedProps: { slot: s },
@@ -688,6 +698,16 @@ export default function Calendar() {
               )}
               {!modal.createDateRange && (
                 <>
+                  {modal.type === 'edit' && modal.slot && (
+                    <div className="rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-700 space-y-1">
+                      <p className="font-medium text-slate-800">Создатель слота</p>
+                      <p>
+                        {String(modal.slot.createdByRole ?? '').toUpperCase() === 'CLIENT'
+                          ? `Клиент${modal.slot.createdByName ? `: ${modal.slot.createdByName}` : ''}`
+                          : `Администратор${modal.slot.createdByName ? `: ${modal.slot.createdByName}` : ''}`}
+                      </p>
+                    </div>
+                  )}
                   {modal.type === 'edit' && modal.slot && (
                     <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 space-y-1">
                       <p className="font-medium text-slate-800">Сверка с «Записями»</p>

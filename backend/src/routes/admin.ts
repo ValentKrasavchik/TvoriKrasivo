@@ -416,6 +416,8 @@ adminRouter.post('/slots', async (req: Request, res: Response) => {
         manualOccupiedSeats: manual,
         durationMinutes: duration,
         status: desiredStatus,
+        createdByRole: 'ADMIN',
+        createdByName: ((req as any).admin?.login ? String((req as any).admin.login) : null),
       },
     });
 
@@ -1161,6 +1163,8 @@ adminRouter.post('/workshop-requests/:id/confirm', async (req: Request, res: Res
           capacity: request.workshop.capacityPerSlot,
           durationMinutes: request.workshop.durationMinutes,
           status: 'OPEN',
+          createdByRole: 'CLIENT',
+          createdByName: request.name,
         },
       });
 
